@@ -1,0 +1,20 @@
+# 研报原文和抽取文本不入库（券商使用条款限制转载）
+*.pdf
+*.PDF
+text/
+ocr/
+reports/
+raw/
+private/
+
+# 含研报摘录的模型与报告放在本地或私有仓库
+*.xlsx
+*.xlsm
+*.docx
+!tests/fixtures/*.xlsx
+
+# 运行产物
+out/
+__pycache__/
+*.pyc
+.DS_Store
