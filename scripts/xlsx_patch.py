@@ -5,7 +5,9 @@
 改完后请运行 lo_recalc.sh 重算缓存值，再用 xlsx_diff.py 核对。
 
 用法：
-  python3 xlsx_patch.py in.xlsx out.xlsx edits.json
+  python3 xlsx_patch.py in.xlsx out.xlsx edits.json [--full-calc-on-load]
+  --full-calc-on-load：把工作簿标记为"打开时强制全量重算"。没有 LibreOffice、无法运行 lo_recalc.sh 时使用，
+                       这样 Excel 打开文件就会更新数字；但文件里缓存的旧值仍然存在，AI 核对数值时应以 Python 复现引擎为准。
 
 edits.json 格式（工作表用显示名称）：
 {
@@ -48,10 +50,12 @@ def sheet_map(z):
 
 
 def main():
-    if len(sys.argv) != 4:
+    full_calc = "--full-calc-on-load" in sys.argv
+    argv = [x for x in sys.argv[1:] if x != "--full-calc-on-load"]
+    if len(argv) != 3:
         print(__doc__)
         sys.exit(1)
-    src, dst, spec_path = sys.argv[1:]
+    src, dst, spec_path = argv
     spec = json.load(open(spec_path, encoding="utf8"))
     zin = zipfile.ZipFile(src)
     files = {n: zin.read(n) for n in zin.namelist()}
@@ -97,6 +101,16 @@ def main():
         ss = ss.replace("</sst>", add + "</sst>")
         ss = re.sub(r'uniqueCount="\d+"', f'uniqueCount="{n0 + len(new_strings)}"', ss)
         files[ss_name] = ss.encode("utf8")
+
+    if full_calc:
+        wb = files["xl/workbook.xml"].decode("utf8")
+        if "<calcPr" in wb:
+            wb = re.sub(r"<calcPr\b([^>]*?)\s*fullCalcOnLoad=\"[^\"]*\"", r"<calcPr\1", wb)
+            wb = re.sub(r"<calcPr\b", '<calcPr fullCalcOnLoad="1"', wb, count=1)
+        else:
+            wb = wb.replace("</workbook>", '<calcPr fullCalcOnLoad="1"/></workbook>')
+        files["xl/workbook.xml"] = wb.encode("utf8")
+        print("已标记：打开时强制全量重算")
 
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx").name
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
