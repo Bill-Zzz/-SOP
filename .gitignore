@@ -18,3 +18,8 @@ out/
 __pycache__/
 *.pyc
 .DS_Store
+
+# 研报库索引与阅读材料（含研报全文）
+sva_index/
+reading/
+manifest*.json

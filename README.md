@@ -1,66 +1,90 @@
 # sellside-valuation-audit
 
-把券商研报转化为可验证的自建估值研究，并持续维护的一套方法和工具：
+研报库驱动的股票估值研究方法与工具。三种模式：
 
-1. 复现估值模型（Python 逐项对账 Excel）
-2. 逐条对照研报原文核对出处，并量化每处问题对每股价值的影响
-3. 修订 Excel（保留图表和公式）和报告
-4. 随新财报、新研报滚动更新
+- **A 新研究：** 从本地研报库检索相关研报并读完 → 和你讨论研究方向（在这里停下来等你决定）→ 生成新的估值模型（Excel + Python 对账）和研究报告 → 用核查流程检查自己的产出
+- **B 核查：** 对照研报原文核对已有报告和模型的出处，量化每处问题的影响，修订 Excel（保留图表）和报告
+- **C 滚动更新：** 新研报、新财报入库后增量更新
 
-任何 AI 工具都能用：能跑代码的智能体按 `SKILL.md` 执行；只能对话的 AI 用 `PROMPT.md`。
+每次运行后都会复盘，把改进建议放进 `LESSONS.md`，经你确认后再升级方法本身（`VERSION` / `CHANGELOG.md`），并补上回归测试。
+
+当前版本：见 `VERSION`。
 
 ## 目录
 ```
-SKILL.md                 完整方法（阶段 0–8 + 滚动维护 + 常见陷阱）
-PROMPT.md                精简版指令，粘贴到任意对话式 AI 的系统提示
-AGENTS.md                给 Codex / Cursor 等编程智能体的入口说明
+SKILL.md        完整方法（模式 A/B/C + 迭代机制 + 常见陷阱）
+PROMPT.md       精简版，粘贴到任意对话式 AI
+AGENTS.md       给 Codex / Cursor 等编程智能体的入口
+METHODS.md      估值方法选择与新模型搭建规范
+LESSONS.md      经验收件箱（待处理 / 已处理）
+CHANGELOG.md    版本记录
 scripts/
-  extract_pdfs.sh        批量抽取研报文本，扫描件自动 OCR
-  render_page.sh         渲染 PDF 指定页为 PNG，核对表格原图
-  dump_xlsx.py           导出 Excel 的公式和缓存值
-  replicate_harness.py   独立复现骨架：对账、反推、弹性表、曲线
-  xlsx_patch.py          直接改 XML 修改单元格（不丢图表）
-  lo_recalc.sh           LibreOffice 强制全量重算
-  xlsx_diff.py           核对修订前后只改了打算改的地方
-templates/               出处台账、核查报告、修订记录、修订版报告大纲
-examples/crwv/           CoreWeave 完整案例（复现引擎 + 流程记录）
-tests/run_tests.sh       自检
+  library_index.py     本地研报库增量索引（机构 / 日期 / 标题 / 代码 / 评级 / 目标价 / 全文）
+  library_search.py    检索并排序，输出阅读清单
+  prepare_reading.py   抽取全文（含 OCR、页码标记），生成阅读包骨架
+  pdf_text.py          PDF 文本 / 渲染 / OCR，自动选用可用工具（无需管理员权限也可用）
+  extract_pdfs.sh      批量抽取文本（命令行版本）
+  render_page.sh       渲染 PDF 页面
+  dump_xlsx.py         导出 Excel 公式和缓存值
+  replicate_harness.py 独立复现骨架：对账 / 反推 / 弹性 / 曲线
+  xlsx_patch.py        修改已有 Excel 而不丢图表（可选打开时强制重算）
+  lo_recalc.sh         LibreOffice 强制全量重算
+  xlsx_diff.py         修订前后差异核对
+templates/      阅读包、研究方向讨论、模型规格、报告大纲、出处台账、核查报告、修订记录、复盘
+examples/crwv/  CoreWeave 案例
+tests/          自检（GitHub Actions 自动运行）
 ```
 
-## 安装依赖
+## 安装
 ```bash
-# macOS
-brew install poppler tesseract tesseract-lang
-brew install --cask libreoffice
-# Ubuntu / Debian
-sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-chi-sim libreoffice-calc
-# Python
-pip install openpyxl numpy
-# 自检
-bash tests/run_tests.sh
+git clone https://github.com/Bill-Zzz/-SOP.git sellside-valuation-audit
+cd sellside-valuation-audit
+pip install openpyxl numpy pypdf            # 必需
+pip install pymupdf rapidocr-onnxruntime     # 可选：没有管理员权限时替代 poppler / tesseract
+# 有管理员权限时也可以装系统工具：
+#   macOS:  brew install poppler tesseract tesseract-lang && brew install --cask libreoffice
+#   Ubuntu: sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-chi-sim libreoffice-calc
+python3 scripts/pdf_text.py check            # 查看可用工具
+bash tests/run_tests.sh                      # 自检（会说明跳过了哪些项）
 ```
 
-## 在不同 AI 工具里使用
+### Claude Code：作为技能安装，并随仓库更新
+```bash
+mkdir -p ~/.claude/skills
+ln -s "$(pwd)" ~/.claude/skills/sellside-valuation-audit   # 软链接，之后 git pull 即可更新
+```
+
+## 怎么用
+**新研究：**
+```text
+研报库在 ~/研报库。帮我研究 CoreWeave（CRWV），按 sellside-valuation-audit 的模式 A 做。
+```
+AI 会先建索引并检索，读完后给你一份阅读包和 3–5 个研究方向，然后停下来等你选。你选定方向后，它再出模型和报告。
+
+**核查：**
+```text
+按模式 B 核查附件里的报告和模型，研报原文在 ~/研报库/CRWV。
+```
+
+**滚动更新：**
+```text
+研报库新增了几份 CRWV 的研报，Q3 财报也出了，按模式 C 更新。
+```
+
+**迭代方法本身：**
+```text
+看一下 LESSONS.md 里待处理的建议，我同意第 1、3 条，帮我改进 skill 并发布新版本。
+```
+
+## 在其他 AI 工具中使用
 | 工具 | 用法 |
 |---|---|
-| Claude（应用 / Claude Code） | 把整个目录放进技能目录（如 `~/.claude/skills/sellside-valuation-audit/`），或在对话里让 Claude 读取 `SKILL.md`。`SKILL.md` 带有标准的 name/description 头部 |
-| OpenAI Codex / Cursor / 其他编程智能体 | 克隆仓库到工作区，智能体会读取 `AGENTS.md`，再按 `SKILL.md` 执行 |
-| ChatGPT 自定义 GPT / 项目 | 把 `PROMPT.md` 的正文粘贴进指令；`SKILL.md` 和 `templates/` 作为知识文件上传 |
-| Gemini Gem、Kimi、豆包、DeepSeek 等 | 把 `PROMPT.md` 粘贴为系统提示或项目说明，再上传报告、模型和研报 |
-
-## 典型用法
-```text
-请按 sellside-valuation-audit 的方法：
-1) 解读附件的估值报告和 Excel 模型；
-2) 对照 reports/ 目录里的研报原文核对出处，给出核查报告和出处台账；
-3) 修订 Excel 和报告，列出留给我确认的判断。
-```
-滚动更新：
-```text
-<公司> 发布了 Q4 财报（附件）。请按 SKILL.md 的"滚动维护"更新估值，并追加修订记录。
-```
+| Claude Code | 如上，软链接到 `~/.claude/skills/` |
+| Claude 应用 | 把技能保存到账户；关联电脑后，让 Claude 访问研报库所在的文件夹 |
+| Codex / Cursor 等 | 克隆仓库到工作区，智能体会自动读取 `AGENTS.md` |
+| ChatGPT / Gemini / Kimi 等对话式 AI | 把 `PROMPT.md` 粘贴为系统提示，再上传研报 |
 
 ## 版权与合规
-- **不要把研报原文或抽取的文本提交到仓库。** `.gitignore` 默认排除 PDF、抽取的文本、xlsx 和 docx。
-- 许多券商研报的使用条款限制转载，或限制作为 AI 系统的输入。使用前请确认你的授权范围。
-- 本仓库的方法和输出仅用于研究框架演示，不构成投资建议。
+- 研报 PDF、抽取的文本和索引（`sva_index/`）不要提交到仓库，`.gitignore` 已默认排除。
+- 许多券商研报的使用条款限制转载，或限制作为 AI 输入，使用前请确认你的授权范围。
+- 方法和输出仅用于研究，不构成投资建议。
