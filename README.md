@@ -33,6 +33,22 @@ scripts/
 templates/      阅读包、研究方向讨论、模型规格、报告大纲、出处台账、核查报告、修订记录、复盘
 examples/crwv/  CoreWeave 案例
 tests/          自检（GitHub Actions 自动运行）
+company-dossier/        第二个 skill：公司档案研究（不建模、不停下、禁止点预测）
+  SKILL.md              方法：范围 → 检索 → 阅读 → 主题/行业/公司三层写作 → 自检 → 交付 → 复盘
+  PROMPT.md             精简版，粘贴到对话式 AI（必须联网）
+  templates/            公司报告、行业报告、主题报告模板；股价事件台账、历史节点台账
+```
+
+## 两个 skill 怎么选
+| 想要 | 用 |
+|---|---|
+| 一次读懂一家公司：历史、团队、股价事件、历史估值、未来利好利空、行业位置 | `company-dossier/`（全自动，不停下；未来只给方向和量级） |
+| 这家公司值多少钱、核查券商或自建模型 | 根目录 `SKILL.md`（sellside-valuation-audit，A3 停下讨论方向） |
+| 两者都要 | 先 company-dossier，再把档案报告作为输入交给 sellside-valuation-audit |
+
+Claude Code 安装第二个 skill：
+```bash
+ln -s "$(pwd)/company-dossier" ~/.claude/skills/company-dossier
 ```
 
 ## 安装
