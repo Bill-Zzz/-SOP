@@ -5,6 +5,7 @@
 生成 <根目录>/ACME/ACME_富途三表_长表.csv、ACME_日线_库内拆股调整.csv。
 数据满足：毛利 = 营收 − 成本；资产 = 负债 + 权益；四个单季之和 = 全年；
 FY2023 有一天 +12% 的跳涨（股价事件回归）。
+期末股数：FY2024 资产负债表有"普通股股数"（量级正确，市值应改用它）；FY2023 也有，但量级差 100 倍（不应采用）。
 """
 import csv
 import datetime as dt
@@ -70,6 +71,9 @@ for fy in range(2019, 2026):
             for k, v in items.items():
                 rows.append([st, f"{fy}/FY", f"{fy}-12-31", fy, 7, "USD", k, float(v), "是"])
         rows.append(["关键指标", f"{fy}/FY", f"{fy}-12-31", fy, 7, "USD", "毛利率", 60.0, "是"])
+        if fy in (2023, 2024):
+            n = SHARES * 1.02 if fy == 2024 else SHARES / 100
+            rows.append(["资产负债表", f"{fy}/FY", f"{fy}-12-31", fy, 7, "USD", "普通股股数", float(n), "是"])
 
 with open(os.path.join(d, "ACME_富途三表_长表.csv"), "w", encoding="utf-8-sig", newline="") as f:
     w = csv.writer(f)

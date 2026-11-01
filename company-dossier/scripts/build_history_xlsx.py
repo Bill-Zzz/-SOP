@@ -36,7 +36,7 @@ try:
 except ImportError:  # pragma: no cover
     sys.exit("缺少 openpyxl：python3 -m pip install --user openpyxl")
 
-SCRIPT_VERSION = "0.5.1"
+SCRIPT_VERSION = "0.6.0"
 CUR_NAME = {"USD": "美元", "TWD": "新台币", "EUR": "欧元", "HKD": "港元", "CNY": "人民币",
             "JPY": "日元", "GBP": "英镑", "KRW": "韩元"}
 STMTS = ["利润表", "资产负债表", "现金流量表"]
@@ -86,6 +86,11 @@ CORE = [
     ("fcf_futu", "自由现金流（富途）", "现金流量表", ["自由现金流"], "amt"),
 ]
 CORE_BY_KEY = {c[0]: c for c in CORE}
+# 期末股数候选科目（单位：股；在资产负债表、关键指标里按顺序找）。富途美股模板的"股本 / -普通股股本"是
+# 面值金额（发行股数 × 每股面值），不是股数，不在候选里；候选值还须与当年基本加权股数相差 0.5–2 倍才采用。
+END_SHARE_STMTS = ["资产负债表", "关键指标"]
+END_SHARE_ITEMS = ["期末普通股股数", "普通股股数", "期末股数", "期末流通股数", "流通股数", "已发行普通股股数",
+                   "期末总股本（股）", "总股本（股）", "流通股本（股）"]
 # 底稿"科目映射.csv"里的中文名 → 本脚本核心键
 MAP_NAME = {"营收": "rev", "营业成本": "cogs", "毛利": "gp", "研发费用": "rd", "销售及管理费用": "sga",
             "营业利润": "op", "净利润": "ni", "基本每股收益": "eps_b", "稀释每股收益": "eps_d",
@@ -226,6 +231,31 @@ class Export:
         err = (0.5 * 10 ** (-max(d, 2))) / abs(eps) if d is not None else None
         return nic / eps / 1e6, err
 
+    def end_shares(self, per):
+        """期末股数（百万股）；返回 (值, 科目名, 未采用的原因)。量级与基本加权股数不符（0.5–2 倍以外）的不采用。"""
+        for st in END_SHARE_STMTS:
+            d = self.data.get((st, per), {})
+            for nm in END_SHARE_ITEMS:
+                v = d.get(nm)
+                if v is None or v <= 0:
+                    continue
+                v /= 1e6
+                wb = self.shares(per, "b")[0]
+                if not wb or wb <= 0:
+                    return None, nm, f"{st}·{nm} 有数，但当年没有加权股数可比对量级，未采用"
+                if not 0.5 <= v / wb <= 2:
+                    return None, nm, f"{st}·{nm} ÷ 基本加权股数 = {v / wb:.3g}，不在 0.5–2，疑似单位不同，未采用"
+                return v, f"{st}·{nm}", None
+        return None, None, None
+
+    def par_amount(self, per):
+        """资产负债表'股本'（面值金额，原币）——只用于在说明里解释它不是股数。"""
+        d = self.data.get(("资产负债表", per), {})
+        for nm in ("股本", "-普通股股本"):
+            if d.get(nm) is not None:
+                return d[nm], nm
+        return None, None
+
 
 def load_daily(code, root, price_start=None):
     """拆股调整日线：库内文件为主，用不复权文件补到最新（按重叠段比值换算）。"""
@@ -354,6 +384,7 @@ class Builder:
         self.years = ex.years
         self.gaps = []
         self.expected_charts = 0
+        self.share_basis = {}
 
     # ---- 年度三表
     def sheet_statements(self):
@@ -727,12 +758,13 @@ class Builder:
         U = self.U
         usd = self.usd
         title(ws, f"{ex.code} 市值与估值（逐财年年末）",
-              "收盘价 = 财年期末日当天或之前最后一个交易日的收盘价（拆股调整价，美元）；股数 = 当年基本加权股数（'年度三表'推算，"
-              "富途每股收益已按拆股调整，与拆股调整价同口径）；市值 = 收盘价 × 股数 ÷ 100（亿美元）；"
+              "收盘价 = 财年期末日当天或之前最后一个交易日的收盘价（拆股调整价，美元）；股数 = 长表有期末股数的年份用期末股数，"
+              "没有的年份退回当年基本加权股数（'年度三表'推算，富途每股收益已按拆股调整，与拆股调整价同口径），'股数口径'列逐年注明；"
+              "市值 = 收盘价 × 股数 ÷ 100（亿美元）；"
               "总债务 = 短期债务 + 长期债务（不含租赁，缺数按 0）；现金 = 现金及短期投资；EV = 市值 + 总债务 − 现金；"
               "P/E 用当年稀释每股收益，亏损年份留空；年内最高 / 最低市值 = 财年内每日收盘价 × 当年股数。"
               + ("" if usd else f"财报为 {self.cur} 原币、股价为美元，未换算：EV 与各倍数留空。"))
-        cols = ["年度", "财年期末日", "年末交易日", "收盘价（美元）", "基本加权股数（百万股）", "市值（亿美元）",
+        cols = ["年度", "财年期末日", "年末交易日", "收盘价（美元）", "股数（百万股）", "股数口径", "市值（亿美元）",
                 f"总债务（{U}）", f"现金及短期投资（{U}）", "企业价值（亿美元）", f"稀释每股收益（{CUR_NAME.get(self.cur, self.cur)}）",
                 "P/E", f"营收（{U}）", "P/S", f"EBITDA（{U}）", "EV/EBITDA", f"FCF（{U}）", "FCF 收益率",
                 "年内最高市值（亿美元）", "最高日", "年内最低市值（亿美元）", "最低日", "数据提供方市值（亿美元）",
@@ -759,8 +791,18 @@ class Builder:
                 ws[c("收盘价（美元）")] = pt[1]
             else:
                 notes.append("日线未覆盖该财年末")
-            ws[c("基本加权股数（百万股）")] = guard(self.T("sh_b", y), [self.T("sh_b", y)])
-            P, S = c("收盘价（美元）"), c("基本加权股数（百万股）")
+            es, es_item, es_why = ex.end_shares(ex.aper[y])
+            if es:
+                ws[c("股数（百万股）")] = es
+                ws[c("股数口径")] = f"期末股数（{es_item}）"
+                self.share_basis[y] = "期末"
+            else:
+                ws[c("股数（百万股）")] = guard(self.T("sh_b", y), [self.T("sh_b", y)])
+                ws[c("股数口径")] = "基本加权股数（推算）"
+                self.share_basis[y] = "加权"
+                if es_why:
+                    notes.append(es_why)
+            P, S = c("收盘价（美元）"), c("股数（百万股）")
             ws[c("市值（亿美元）")] = guard(f"{P}*{S}/100", [P, S])
             ws[c(f"总债务（{U}）")] = f"=N({self.T('std', y)})+N({self.T('ltd', y)})"
             ws[c(f"现金及短期投资（{U}）")] = guard(self.T("cash_sti", y), [self.T("cash_sti", y)])
@@ -779,7 +821,7 @@ class Builder:
                 ws[c("EV/EBITDA")] = guard(f'IF({EB}<=0,"",{EV}/{EB})', [EV, EB])
                 FC = c(f"FCF（{U}）")
                 ws[c("FCF 收益率")] = guard(f"{FC}/{M}", [FC, M])
-            sb = ex.shares(ex.aper[y], "b")[0]
+            sb = es or ex.shares(ex.aper[y], "b")[0]
             if pt and sb:
                 self.mcap_py[y] = pt[1] * sb / 100
                 start = dt.date.fromisoformat(ex.meta[ex.aper[y - 1]]["end"]) if (y - 1) in ex.aper else end - dt.timedelta(days=365)
@@ -796,7 +838,7 @@ class Builder:
                         notes.append(f"日线从 {win[0][0]} 起，年内高低点只覆盖部分财年")
             elif not sb:
                 notes.append("股数缺（净利润或每股收益为 0 / 缺数）")
-            serr = ex.shares(ex.aper[y], "b")[1]
+            serr = None if es else ex.shares(ex.aper[y], "b")[1]
             if serr is not None and serr > 0.01:
                 notes.append(f"股数由每股收益推算，最大舍入误差约 ±{serr:.1%}")
             if y in self.ref_mcap:
@@ -806,13 +848,14 @@ class Builder:
             ws[c("备注")] = "；".join(notes) or None
             ws[c("来源ID")] = "F1；F2" + ("；M1" if y in self.ref_mcap else "")
             for name in cols:
-                if name in ("年度", "财年期末日", "年末交易日", "最高日", "最低日", "备注", "来源ID"):
+                if name in ("年度", "财年期末日", "年末交易日", "最高日", "最低日", "股数口径", "备注", "来源ID"):
                     continue
                 fmt = F_X if name in ("P/E", "P/S", "EV/EBITDA") else (F_PCT if name in ("FCF 收益率", "差异") else
                                                                      ("0.0000" if "每股" in name else F_AMT))
                 ws[c(name)].number_format = fmt
         for name in cols:
             ws.column_dimensions[V[name]].width = 12
+        ws.column_dimensions[V["股数口径"]].width = 22
         ws.column_dimensions[V["备注"]].width = 40
 
     # ---- 市值与营收对比
@@ -1239,6 +1282,7 @@ class Builder:
             ("日线", f"{self.pxinfo['basis']}；{self.pxinfo['start']} 至 {self.pxinfo['end']}"
                    + (f"；{self.pxinfo['ext']}" if self.pxinfo.get("ext") else "")),
             ("股数", "加权股数由'归属普通股股东净利润 ÷ 每股收益'推算（富途没有股数行）；每股收益小数位少的年份有舍入误差，见'年度衍生指标'备注。"),
+            ("市值的股数口径", self.share_basis_text()),
             ("已知缺口", "见'缺口'表：底稿缺口原样并入；第二层各表未填；大盘同日幅度待补。"),
             ("生成", f"{self.today.isoformat()}；脚本 build_history_xlsx.py v{SCRIPT_VERSION}；AI：{self.ai}；输入：{ex.long_file}（文件日期 {ex.long_mtime}）"),
         ]
@@ -1266,8 +1310,10 @@ class Builder:
             ("年度衍生指标", "公式写在单元格，口径写在表头说明行。", "GAAP − 非GAAP 差额为第二层"),
             ("近12季度明细", "最近 12 个单季；环比、同比公式；上年同期为同比基数。", "分部逐季为第二层"),
             ("市值与营收对比", "本公司列自动；参考公司列与同行横向比较表为第二层。", "参考公司全部待填"),
-            ("市值与估值", "财年末收盘价 × 当年基本加权股数；EV = 市值 + 总债务 − 现金及短期投资。",
-             "数据提供方市值" + ("已提供（M1）" if self.ref_mcap else "未提供：外部对照待补") + ("" if self.usd else "；非美元财报不算倍数")),
+            ("市值与估值", "财年末收盘价 × 股数（有期末股数用期末股数，否则用当年基本加权股数，'股数口径'列逐年注明）；"
+                        "EV = 市值 + 总债务 − 现金及短期投资。",
+             "数据提供方市值" + ("已提供（M1）" if self.ref_mcap else "未提供：外部对照待补") + ("" if self.usd else "；非美元财报不算倍数")
+             + ("；期末股数缺，市值用加权股数" if "加权" in self.share_basis.values() else "")),
             ("股价事件", "单日 ±8% 或 21 日 ±20%；拆股调整价。", "同日大盘幅度待补；事件类型由报告填"),
             ("IPO指标", "第二层空表。", "全部待填"),
             ("所得税与现金税", "所得税费用、税前利润、递延（现金流量表调整项）、当期（推算）、有效税率自动。", "现金税、地域拆分、递延税资产等为第二层"),
@@ -1286,6 +1332,24 @@ class Builder:
         ws.column_dimensions["A"].width = 26
         ws.column_dimensions["B"].width = 100
         ws.column_dimensions["C"].width = 40
+
+    def share_basis_text(self):
+        ex = self.ex
+        end_y = [y for y in self.years if self.share_basis.get(y) == "期末"]
+        wt_y = [y for y in self.years if self.share_basis.get(y) == "加权"]
+        span = lambda ys: f"FY{ys[0]}–FY{ys[-1]}（{len(ys)} 年）" if ys else "无"
+        if not wt_y:
+            return f"市值全部用期末股数：{span(end_y)}。"
+        y = self.years[-1]
+        par, par_nm = ex.par_amount(ex.aper[y])
+        par_txt = (f"资产负债表的'{par_nm}'是面值金额（发行股数 × 每股面值，FY{y} 为 {par / 1e8:,.2f} {self.U}），不是股数；"
+                   "导出里没有每股面值和库存股股数，不能由它换算出流通股数。") if par is not None else ""
+        head = (f"期末股数：{span(end_y)}；其余年份退回基本加权股数：{span(wt_y)}。" if end_y else
+                "长表（资产负债表、关键指标）没有期末股数类科目（候选：" + "、".join(END_SHARE_ITEMS[:6]) + " 等），"
+                "市值全部用当年基本加权股数。")
+        return (head + par_txt + "加权股数是全年平均，股数增长快的年份（上市当年、大量换股收购、期权行权多）会低于年末股数，"
+                "市值因此偏低；与按年末流通股计算的数据提供方市值对照时，这些年份差异最大。期末股数可从 10-K 封面页"
+                "（流通股数）或股东权益附注补，属第二层。")
 
     def sheet_gaps(self):
         ws, ex = self.ws["缺口"], self.ex
@@ -1310,6 +1374,11 @@ class Builder:
         rows.append(("股价事件：同日大盘幅度", "全部", "没有指数日线", "yfinance 取 ^GSPC / ^IXIC 或 SOXX 日线", "1（待补）", "—"))
         if not self.ref_mcap:
             rows.append(("市值与估值：数据提供方市值", "全部", "没有外部市值对照", "companiesmarketcap 等；用 --ref-mcap 传入", "1（待补）", "—"))
+        wt_y = [y for y in self.years if self.share_basis.get(y) == "加权"]
+        if wt_y:
+            per = "全部" if len(wt_y) == len(self.years) else "、".join(f"FY{y}" for y in wt_y)
+            rows.append(("市值与估值：期末股数", per, "长表没有期末股数，市值用基本加权股数（股数增长快的年份偏低）",
+                         "10-K 封面页流通股数 / 股东权益附注", "2", "F1"))
         if self.pxinfo["start"] and self.years:
             first_end = ex.meta[ex.aper[self.years[0]]]["end"]
             if self.pxinfo["start"] > first_end:
@@ -1343,7 +1412,8 @@ class Builder:
         hdr(ws, r + 1, ["年度", f"{ex.code}营收来源", f"{ex.code}市值来源", "参考公司市值来源", "参考公司营收来源", "参考公司营收口径"])
         for i, y in enumerate(self.years):
             rr = r + 2 + i
-            ws[f"A{rr}"], ws[f"B{rr}"], ws[f"C{rr}"] = y, "F1", "F2 收盘价 × F1 推算股数"
+            ws[f"A{rr}"], ws[f"B{rr}"] = y, "F1"
+            ws[f"C{rr}"] = "F2 收盘价 × F1 期末股数" if self.share_basis.get(y) == "期末" else "F2 收盘价 × F1 推算基本加权股数"
         for col, w in zip("ABCDEF", [10, 40, 60, 40, 30, 30]):
             ws.column_dimensions[col].width = w
 
@@ -1794,6 +1864,7 @@ def run_checks(xlsx, ex, ref_mcap=None, expected_charts=13):
     vs = wb["市值与估值"]
     vh = {c.value: c.column_letter for c in vs[4] if c.value}
     bad_px, bad_m, far, nm, nref = [], [], [], 0, 0
+    basis, no_basis = defaultdict(int), []
     for r in range(5, vs.max_row + 1):
         y = vs[f"A{r}"].value
         if not isinstance(y, int):
@@ -1803,7 +1874,15 @@ def run_checks(xlsx, ex, ref_mcap=None, expected_charts=13):
         if not isinstance(m, (int, float)) or isinstance(m, bool):
             continue
         nm += 1
-        s = val("市值与估值", f"{vh['基本加权股数（百万股）']}{r}")
+        if "股数口径" in vh:
+            b = str(vs[f"{vh['股数口径']}{r}"].value or "")
+            if b.startswith("期末股数"):
+                basis["期末股数"] += 1
+            elif b.startswith("基本加权股数"):
+                basis["基本加权股数"] += 1
+            else:
+                no_basis.append(y)
+        s = val("市值与估值", f"{vh.get('股数（百万股）') or vh['基本加权股数（百万股）']}{r}")
         if abs(m - p * s / 100) > 1e-9 * abs(m):
             bad_m.append(y)
         if (e - d).days > 10 or d > e:
@@ -1819,8 +1898,11 @@ def run_checks(xlsx, ex, ref_mcap=None, expected_charts=13):
     else:
         ok6 = not bad_px and not bad_m
         ext = "没有数据提供方市值（未传 --ref-mcap），外部 5% 对照未做，已记入缺口"
+    ok6 = ok6 and not no_basis
+    btxt = ("股数口径：" + "、".join(f"{k} {v} 年" for k, v in basis.items()) +
+            (f"，未注明 {no_basis}" if no_basis else "")) if "股数口径" in vh else "股数口径列缺（旧版工作簿）"
     add("6 市值与估值：年末价 × 股数（与数据提供方市值差 < 5%）", ok6,
-        f"{nm} 年有市值；年末交易日距财年末 > 10 天的 {bad_px or '无'}；市值 ≠ 价 × 股数 的 {bad_m or '无'}；{ext}")
+        f"{nm} 年有市值；{btxt}；年末交易日距财年末 > 10 天的 {bad_px or '无'}；市值 ≠ 价 × 股数 的 {bad_m or '无'}；{ext}")
 
     # 7 图表
     z = zipfile.ZipFile(xlsx)

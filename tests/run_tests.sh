@@ -98,6 +98,7 @@ python3 tests/make_history_fixture.py "$TMP/futu" >/dev/null
 python3 company-dossier/scripts/build_history_xlsx.py ACME --root "$TMP/futu" --out "$TMP/hist" --ai 测试 --check \
   | tee "$TMP/hist.txt"
 grep -q "结果：8/8 通过" "$TMP/hist.txt"
+grep -q "股数口径：基本加权股数 5 年、期末股数 1 年" "$TMP/hist.txt"
 python3 - "$TMP/hist" <<'EOF'
 import glob, sys, zipfile, openpyxl
 p = glob.glob(sys.argv[1] + "/*_ACME_历史数据_v1_测试.xlsx")
@@ -113,7 +114,15 @@ assert str(wb["年度衍生指标"]["E5"].value).startswith("=IF(COUNT("), "衍�
 ev = [r for r in wb["股价事件"].iter_rows(min_row=5, values_only=True) if r[1] == "单日"]
 assert len(ev) == 1 and str(ev[0][0])[:10] == "2023-03-15", ev
 assert len([n for n in zipfile.ZipFile(p[0]).namelist() if n.startswith("xl/charts/chart")]) == 13
-print("历史数据 Excel：17 张表、13 张图、近 12 季、股价事件、公式均正确")
+vs = wb["市值与估值"]
+h = {c.value: c.column for c in vs[4] if c.value}
+row = {vs.cell(r, 1).value: r for r in range(5, vs.max_row + 1) if isinstance(vs.cell(r, 1).value, int)}
+basis = {y: vs.cell(r, h["股数口径"]).value for y, r in row.items()}
+assert basis[2024] == "期末股数（资产负债表·普通股股数）", basis
+assert basis[2023] == basis[2022] == "基本加权股数（推算）", basis
+assert abs(vs.cell(row[2024], h["股数（百万股）"]).value - 1020) < 1e-6
+assert "未采用" in str(vs.cell(row[2023], h["备注"]).value), "量级不对的期末股数应注明未采用"
+print("历史数据 Excel：17 张表、13 张图、近 12 季、股价事件、公式、市值股数口径均正确")
 EOF
 
 echo
