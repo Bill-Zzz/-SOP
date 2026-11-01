@@ -4,6 +4,7 @@
 #   2) 研报库索引 / 检索 / 阅读准备（含日期误判等回归测试）
 #   3) xlsx 修改流程：保留图表、公式、隐藏表；强制重算标记
 #   4) LibreOffice 重算（未安装时明确报告为"跳过"）
+#   5) 历史数据 Excel 脚本：用虚构公司 ACME 的最小长表生成工作簿并跑 --check
 # 用法：bash tests/run_tests.sh   （在仓库根目录运行）
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -91,6 +92,38 @@ EOF
 else
   SKIPPED+=("LibreOffice 重算测试（未安装 LibreOffice）")
 fi
+
+echo "== 5. 历史数据 Excel 脚本 =="
+python3 tests/make_history_fixture.py "$TMP/futu" >/dev/null
+python3 company-dossier/scripts/build_history_xlsx.py ACME --root "$TMP/futu" --out "$TMP/hist" --ai 测试 --check \
+  | tee "$TMP/hist.txt"
+grep -q "结果：8/8 通过" "$TMP/hist.txt"
+grep -q "股数口径：基本加权股数 5 年、期末股数 1 年" "$TMP/hist.txt"
+python3 - "$TMP/hist" <<'EOF'
+import glob, sys, zipfile, openpyxl
+p = glob.glob(sys.argv[1] + "/*_ACME_历史数据_v1_测试.xlsx")
+assert len(p) == 1, p
+wb = openpyxl.load_workbook(p[0])
+for s in ["图表总览", "说明", "历年营收与业务拆分", "年度三表", "年度衍生指标", "近12季度明细", "市值与营收对比",
+          "市值与估值", "股价事件", "IPO指标", "所得税与现金税", "重大融资时间线", "重要收购", "指引与实际",
+          "缺口", "来源", "图表计算"]:
+    assert s in wb.sheetnames, f"缺工作表 {s}"
+q = [c.value for c in wb["近12季度明细"][3][2:14]]
+assert q[-1] == "FY2025Q2" and q[0] == "FY2022Q3", q
+assert str(wb["年度衍生指标"]["E5"].value).startswith("=IF(COUNT("), "衍生指标应为公式"
+ev = [r for r in wb["股价事件"].iter_rows(min_row=5, values_only=True) if r[1] == "单日"]
+assert len(ev) == 1 and str(ev[0][0])[:10] == "2023-03-15", ev
+assert len([n for n in zipfile.ZipFile(p[0]).namelist() if n.startswith("xl/charts/chart")]) == 13
+vs = wb["市值与估值"]
+h = {c.value: c.column for c in vs[4] if c.value}
+row = {vs.cell(r, 1).value: r for r in range(5, vs.max_row + 1) if isinstance(vs.cell(r, 1).value, int)}
+basis = {y: vs.cell(r, h["股数口径"]).value for y, r in row.items()}
+assert basis[2024] == "期末股数（资产负债表·普通股股数）", basis
+assert basis[2023] == basis[2022] == "基本加权股数（推算）", basis
+assert abs(vs.cell(row[2024], h["股数（百万股）"]).value - 1020) < 1e-6
+assert "未采用" in str(vs.cell(row[2023], h["备注"]).value), "量级不对的期末股数应注明未采用"
+print("历史数据 Excel：17 张表、13 张图、近 12 季、股价事件、公式、市值股数口径均正确")
+EOF
 
 echo
 if [ ${#SKIPPED[@]} -gt 0 ]; then
