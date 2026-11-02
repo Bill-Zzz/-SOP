@@ -12,6 +12,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libreoffice-calc poppler-utils
-          pip install openpyxl numpy
+          pip install openpyxl numpy python-docx matplotlib pillow
       - name: Run tests
         run: bash tests/run_tests.sh

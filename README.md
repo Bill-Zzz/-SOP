@@ -36,6 +36,7 @@ tests/          自检（GitHub Actions 自动运行）
 company-dossier/        第二个 skill：公司档案研究（不建模、不停下、禁止点预测）
   SKILL.md              方法：范围 → 检索 → 阅读 → 主题/行业/公司三层写作 → 自检 → 交付 → 复盘
   PROMPT.md             精简版，粘贴到对话式 AI（必须联网）
+  scripts/              build_history_xlsx.py（历史数据 Excel，--png 导出图表快照）、md2docx.py（报告 .md → .docx）
   templates/            公司报告、行业报告、主题报告模板；股价事件台账、历史节点台账
   prompts/              可直接发给其他 AI 的提示词包（公司清单、主题报告）
 ```

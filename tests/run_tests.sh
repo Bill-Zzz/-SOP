@@ -4,7 +4,8 @@
 #   2) 研报库索引 / 检索 / 阅读准备（含日期误判等回归测试）
 #   3) xlsx 修改流程：保留图表、公式、隐藏表；强制重算标记
 #   4) LibreOffice 重算（未安装时明确报告为"跳过"）
-#   5) 历史数据 Excel 脚本：用虚构公司 ACME 的最小长表生成工作簿并跑 --check
+#   5) 历史数据 Excel 脚本：用虚构公司 ACME 的最小长表生成工作簿并跑 --check；--png 导出图表快照
+#   6) md2docx.py：示例 .md（标题、表格、现场生成的占位 PNG、图注）转 .docx 后读回检查
 # 用法：bash tests/run_tests.sh   （在仓库根目录运行）
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -123,6 +124,58 @@ assert basis[2023] == basis[2022] == "基本加权股数（推算）", basis
 assert abs(vs.cell(row[2024], h["股数（百万股）"]).value - 1020) < 1e-6
 assert "未采用" in str(vs.cell(row[2023], h["备注"]).value), "量级不对的期末股数应注明未采用"
 print("历史数据 Excel：17 张表、13 张图、近 12 季、股价事件、公式、市值股数口径均正确")
+EOF
+if python3 -c "import matplotlib" 2>/dev/null; then
+  python3 company-dossier/scripts/build_history_xlsx.py ACME --root "$TMP/futu" --check-only "$TMP"/hist/*_ACME_历史数据_v1_测试.xlsx \
+    --png "$TMP/png" | tee "$TMP/png.txt"
+  grep -q "结果：9/9 通过" "$TMP/png.txt"
+  grep -q "跳过：图 2 无数据" "$TMP/png.txt"
+  python3 - "$TMP/png" <<'EOF'
+import os, sys
+fs = sorted(os.listdir(sys.argv[1]))
+assert len(fs) == 10, fs
+assert fs[0] == "图01_营收与增速.png" and "图11_股价与事件.png" in fs, fs
+assert not any(f.startswith(("图02_", "图12_", "图13_")) for f in fs), "第二层未填的图应跳过"
+assert all(os.path.getsize(os.path.join(sys.argv[1], f)) > 5000 for f in fs)
+print("--png：10 张有数据的图已导出，第二层未填的 3 张跳过，编号与图表总览一致")
+EOF
+else
+  SKIPPED+=("--png 导出测试（未安装 matplotlib）")
+fi
+
+echo "== 6. md2docx.py =="
+python3 -c "import docx" 2>/dev/null || pip install -q python-docx --break-system-packages
+mkdir -p "$TMP/md/fig"
+cp tests/fixtures/md2docx_sample.md "$TMP/md/"
+python3 -c "from PIL import Image; Image.new('RGB', (1600, 800), (78, 121, 167)).save('$TMP/md/fig/图01_营收与增速.png', dpi=(200, 200))"
+python3 company-dossier/scripts/md2docx.py "$TMP/md/md2docx_sample.md" --out "$TMP/md/out.docx" | tee "$TMP/md.txt"
+grep -q "标题 6（一级 1 / 二级 3 / 三级 2）；表格 2；图片 1" "$TMP/md.txt"
+if python3 company-dossier/scripts/md2docx.py "$TMP/md/md2docx_sample.md" --check-only --img-root "$TMP/nowhere" \
+    >/dev/null 2>"$TMP/md_err.txt"; then
+  echo "缺图时应以非零码退出"; exit 1
+fi
+grep -q "fig/图01_营收与增速.png" "$TMP/md_err.txt"
+python3 - "$TMP/md/out.docx" <<'EOF'
+import sys
+import docx
+from docx.oxml.ns import qn
+d = docx.Document(sys.argv[1])
+heads = [p for p in d.paragraphs if p.style.name.startswith("Heading")]
+assert len(heads) == 6, [p.text for p in heads]
+assert len(d.tables) == 2 and d.tables[0].style.name == "Table Grid"
+assert len(d.tables[0].rows) == 4 and len(d.tables[0].columns) == 4
+assert all(r.bold for r in d.tables[0].rows[0].cells[0].paragraphs[0].runs), "表头应加粗"
+assert len(d.inline_shapes) == 1 and d.inline_shapes[0].width <= 15 * 360000
+normal = d.styles["Normal"]
+rf = normal.element.rPr.rFonts
+assert normal.font.name == "Noto Sans SC" and rf.get(qn("w:eastAsia")) == "Noto Sans SC", "正文字体应为 Noto Sans SC（含东亚）"
+assert normal.font.size.pt == 10.5
+notes = [p for p in d.paragraphs if p.style.name == "注释小字"]
+assert {p.text.split("：")[0] for p in notes} >= {"表注", "数据与可编辑图表", "来源"}, [p.text for p in notes]
+assert d.styles["注释小字"].font.size.pt == 9
+body = "\n".join(p.text for p in d.paragraphs)
+assert "[R01234 p5]" in body and "**" not in body
+print("md2docx：6 个标题、2 张真表格（表头加粗）、1 张图（≤ 15 cm）、正文 Noto Sans SC 10.5 pt、注释 9 pt、缺图报错均正确")
 EOF
 
 echo
