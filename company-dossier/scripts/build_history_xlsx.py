@@ -4,6 +4,10 @@
 用法：
   python3 build_history_xlsx.py <代码> --root <futu_export 根目录> --out <输出目录> [--ai 名字] [--check]
   python3 build_history_xlsx.py <代码> --root <根目录> --check-only <已生成的 xlsx>
+  加 --png <目录>：把"图表总览"的每张图用同一份数据区（"图表计算"）画成 PNG 快照，文件名 图01_营收与增速.png、
+  图02_分部结构.png……编号与图表总览顺序一致；第二层没填、数据为空的图跳过并打印"跳过：图 X 无数据"。
+  依赖 matplotlib（缺时跳过并提示，不报错）；中文字体用 Noto Sans CJK / Noto Sans SC / WenQuanYi，找不到退回 DejaVu 并警告。
+  同时加 --check 时多一项"9 PNG 快照数量 = 有数据的图数量"。每家公司用单独的 PNG 目录（文件名不含代码）。
 
 输入（<根目录>/<代码>/ 下）：
   <代码>_富途三表_长表.csv（优先；没有则用 <代码>_富途财报_长表.csv）
@@ -11,7 +15,7 @@
   底稿CSV/<代码>_科目映射.csv、_缺口.csv、_检查.csv（有则用）
 可选：--ref-mcap <CSV>（列：年度,市值，单位亿美元），作为"数据提供方市值"参与验收的 5% 对照。
 
-只依赖 openpyxl 与标准库。工作簿用 openpyxl 新建，图表为原生图表，数据区在"图表计算"表用公式引用。
+只依赖 openpyxl 与标准库（--png 另需 matplotlib）。工作簿用 openpyxl 新建，图表为原生图表，数据区在"图表计算"表用公式引用。
 """
 import argparse
 import csv
@@ -36,7 +40,7 @@ try:
 except ImportError:  # pragma: no cover
     sys.exit("缺少 openpyxl：python3 -m pip install --user openpyxl")
 
-SCRIPT_VERSION = "0.6.0"
+SCRIPT_VERSION = "0.8.0"
 CUR_NAME = {"USD": "美元", "TWD": "新台币", "EUR": "欧元", "HKD": "港元", "CNY": "人民币",
             "JPY": "日元", "GBP": "英镑", "KRW": "韩元"}
 STMTS = ["利润表", "资产负债表", "现金流量表"]
@@ -1972,6 +1976,247 @@ def print_checks(res, code):
     return n_ok == len(res)
 
 
+# ---------------------------------------------------------------- PNG 快照（--png）
+# 编号与"图表总览"的顺序一致；文件名 图01_营收与增速.png …
+PNG_NAMES = {1: "营收与增速", 2: "分部结构", 3: "利润率带", 4: "现金流去向", 5: "资本开支与经营现金流",
+             6: "股数与回购", 7: "市值与营收", 8: "估值倍数带", 9: "近12季营收与增速", 10: "近12季利润率",
+             11: "股价与事件", 12: "市值对比参考公司", 13: "同行横向比较"}
+# 低饱和、色盲友好的固定配色（Tableau 10 前段），不用彩虹色
+PNG_COLORS = ["#4E79A7", "#F28E2B", "#59A14F", "#E15759", "#76B7B2", "#B07AA1", "#9C755F", "#BAB0AC"]
+LAYER2_PREFIX = ("分部", "参考公司")  # 第二层系列：这些全空时整张图视为无数据
+PNG_RE = re.compile(r"^图\d{2}_.+\.png$")
+
+
+def _title_text(t):
+    if t is None:
+        return ""
+    if isinstance(t, str):
+        return t
+    try:
+        return "".join(r.t for p in t.tx.rich.p for r in (p.r or []))
+    except AttributeError:
+        return ""
+
+
+def _ref_values(ev, f):
+    sh, rng = f.rsplit("!", 1)
+    sh = sh.strip("'").replace("''", "'")
+    rng = rng.replace("$", "")
+    a, b = rng.split(":") if ":" in rng else (rng, rng)
+    out = []
+    for row in ev.wb[sh][a:b]:
+        for c in row:
+            try:
+                out.append(ev.cell(sh, c.coordinate))
+            except XErr:
+                out.append(None)
+    return out
+
+
+def _num_or_none(v):
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    return float(v)
+
+
+def chart_specs(wb):
+    """读"图表总览"上的每张原生图表，按其数据引用从"图表计算"求值，返回可画图的结构。"""
+    ev = Evaluator(wb)
+    specs = []
+    for k, ch in enumerate(wb["图表总览"]._charts, start=1):
+        t = _title_text(ch.title)
+        m = re.match(r"\s*(\d+)\s*(.*)", t)
+        num, label = (int(m.group(1)), m.group(2)) if m else (k, t)
+        groups = []
+        for gi, sub in enumerate(getattr(ch, "_charts", None) or [ch]):
+            kind = sub.tagname
+            series = []
+            for s in sub.series:
+                name = ""
+                if s.tx is not None and s.tx.strRef is not None:
+                    v = _ref_values(ev, s.tx.strRef.f)
+                    name = str(v[0]) if v and v[0] is not None else ""
+                elif s.tx is not None and s.tx.v:
+                    name = s.tx.v
+                if kind == "scatterChart":
+                    xs = _ref_values(ev, s.xVal.numRef.f)
+                    ys = [_num_or_none(v) for v in _ref_values(ev, s.yVal.numRef.f)]
+                    # 线条设为 noFill 的是只画点的系列（股价事件），其余画成线（月末收盘）
+                    ln = s.spPr.ln if s.spPr is not None else None
+                    as_line = not (ln is not None and ln.noFill)
+                    series.append({"name": name, "x": xs, "y": ys, "line": as_line})
+                else:
+                    cref = (s.cat.numRef or s.cat.strRef) if s.cat is not None else None
+                    cats = _ref_values(ev, cref.f) if cref is not None else []
+                    ys = [_num_or_none(v) for v in _ref_values(ev, s.val.numRef.f)]
+                    series.append({"name": name, "cat": cats, "y": ys})
+            yfmt = getattr(sub.y_axis, "number_format", None) or ""
+            log = getattr(getattr(sub.y_axis, "scaling", None), "logBase", None)
+            groups.append({"kind": kind, "stacked": getattr(sub, "grouping", "") == "stacked",
+                           "secondary": gi > 0, "pct": "%" in str(yfmt), "log": bool(log),
+                           "ytitle": _title_text(getattr(sub.y_axis, "title", None)), "series": series})
+        specs.append({"num": num, "title": label, "groups": groups})
+    return specs
+
+
+def spec_has_data(spec):
+    ser = [s for g in spec["groups"] for s in g["series"]]
+    filled = lambda s: any(v is not None for v in s["y"])
+    l2 = [s for s in ser if s["name"].startswith(LAYER2_PREFIX)]
+    if l2 and not any(filled(s) for s in l2):
+        return False
+    if "同行" in spec["title"]:  # 第一行是本公司（自动），至少还要有一家同行才算第二层已填
+        return any(sum(v is not None for v in s["y"]) >= 2 for s in ser)
+    return any(filled(s) for s in ser)
+
+
+def png_name(num):
+    return f"图{num:02d}_{PNG_NAMES.get(num, f'图表{num}')}.png"
+
+
+def _pick_cjk_font(fm):
+    names = {f.name for f in fm.fontManager.ttflist}
+    for want in ("Noto Sans CJK SC", "Noto Sans SC"):
+        if want in names:
+            return want
+    for n in sorted(names):
+        if n.startswith("Noto Sans CJK") and not n.endswith(("Black", "Thin", "Light", "DemiLight", "Medium")):
+            return n
+    for n in sorted(names):
+        if n.startswith("WenQuanYi"):
+            return n
+    return None
+
+
+def export_png(xlsx, outdir, code=""):
+    """把"图表总览"的每张图按同一份数据区画成 PNG。缺 matplotlib 时返回 None（不报错）。"""
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from matplotlib import font_manager as fm
+        from matplotlib.ticker import FuncFormatter, PercentFormatter
+    except ImportError:
+        print("未装 matplotlib，跳过 PNG 导出（python3 -m pip install --user matplotlib）")
+        return None
+    font = _pick_cjk_font(fm)
+    if font:
+        plt.rcParams["font.family"] = [font, "DejaVu Sans"]
+    else:
+        plt.rcParams["font.family"] = ["DejaVu Sans"]
+        print("警告：没找到 Noto Sans CJK / Noto Sans SC / WenQuanYi 中文字体，退回 DejaVu Sans，图中中文可能显示为方框")
+    plt.rcParams["axes.unicode_minus"] = False
+    os.makedirs(outdir, exist_ok=True)
+    wb = openpyxl.load_workbook(xlsx)
+    written = []
+    for sp in chart_specs(wb):
+        if not spec_has_data(sp):
+            print(f"跳过：图 {sp['num']} 无数据")
+            continue
+        fig, ax = plt.subplots(figsize=(8, 4), dpi=200)
+        ax2, ci, cats_main = None, 0, []
+        handles = []
+        for g in sp["groups"]:
+            a = ax
+            if g["secondary"]:
+                ax2 = ax2 or ax.twinx()
+                a = ax2
+            if g["kind"] == "scatterChart":
+                for s in g["series"]:
+                    pts = [(x, y) for x, y in zip(s["x"], s["y"])
+                           if y is not None and isinstance(x, (dt.date, dt.datetime))]
+                    if not pts:
+                        continue
+                    xs, ys = zip(*pts)
+                    c = PNG_COLORS[ci % len(PNG_COLORS)]
+                    ci += 1
+                    if s["line"]:
+                        h, = a.plot(xs, ys, color=c, linewidth=1.2, label=s["name"])
+                    else:
+                        h = a.scatter(xs, ys, color=c, s=14, zorder=3, label=s["name"])
+                    handles.append(h)
+                if g["log"]:
+                    a.set_yscale("log")
+            else:
+                # 组合图的副轴系列没有单独的分类轴，沿用主图的分类
+                cats = (g["series"][0]["cat"] if g["series"] else []) or cats_main
+                cats_main = cats_main or cats
+                keep = [i for i, v in enumerate(cats) if v not in (None, "")]
+                lab = [str(int(cats[i])) if isinstance(cats[i], float) and cats[i].is_integer() else str(cats[i])
+                       for i in keep]
+                xs = list(range(len(keep)))
+                nb = sum(1 for s in g["series"] if any(v is not None for v in s["y"]))
+                jb = 0
+                pos_base, neg_base = [0.0] * len(keep), [0.0] * len(keep)
+                for j, s in enumerate(g["series"]):
+                    ys = [s["y"][i] if i < len(s["y"]) else None for i in keep]
+                    c = PNG_COLORS[ci % len(PNG_COLORS)]
+                    ci += 1
+                    if not any(v is not None for v in ys):
+                        continue
+                    if g["kind"] == "barChart":
+                        vals = [v if v is not None else 0.0 for v in ys]
+                        if g["stacked"]:
+                            bottom = [pb if v >= 0 else nb_ for v, pb, nb_ in zip(vals, pos_base, neg_base)]
+                            h = a.bar(xs, vals, 0.7, bottom=bottom, color=c, label=s["name"])
+                            for i, v in enumerate(vals):
+                                if v >= 0:
+                                    pos_base[i] += v
+                                else:
+                                    neg_base[i] += v
+                        else:
+                            w = 0.8 / max(nb, 1)
+                            h = a.bar([x - 0.4 + w * (jb + 0.5) for x in xs], vals, w, color=c, label=s["name"])
+                            jb += 1
+                    else:
+                        h, = a.plot(xs, [v if v is not None else float("nan") for v in ys], color=c,
+                                    linewidth=1.6, marker="o", markersize=2.5, label=s["name"])
+                    handles.append(h)
+                if not g["secondary"]:
+                    a.set_xticks(xs)
+                    a.set_xticklabels(lab, rotation=45 if len(lab) > 12 else 0,
+                                      ha="right" if len(lab) > 12 else "center", fontsize=7)
+            if g["pct"]:
+                a.yaxis.set_major_formatter(PercentFormatter(1.0, decimals=None))
+            else:
+                plain = FuncFormatter(lambda v, _: f"{v:,.0f}" if abs(v - round(v)) < 1e-9 else f"{v:,.1f}")
+                a.yaxis.set_major_formatter(plain)
+                if g["log"]:
+                    a.yaxis.set_minor_formatter(plain)
+            if g["ytitle"]:
+                a.set_ylabel(g["ytitle"], fontsize=8)
+            a.tick_params(which="both", labelsize=7)
+        if any(g["kind"] == "barChart" for g in sp["groups"]):
+            ax.axhline(0, color="#999999", linewidth=0.6)
+        ax.set_title(f"图 {sp['num']}  {sp['title']}" + (f"｜{code}" if code else ""), fontsize=10, loc="left")
+        for a in (ax, ax2):
+            if a is not None:
+                for side in ("top",) + (() if a is ax2 else ("right",)):
+                    a.spines[side].set_visible(False)
+        ax.grid(axis="y", color="#E5E5E5", linewidth=0.6)
+        ax.set_axisbelow(True)
+        if handles:
+            ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=min(len(handles), 4),
+                      fontsize=7, frameon=False)
+        fig.tight_layout()
+        p = os.path.join(outdir, png_name(sp["num"]))
+        fig.savefig(p)
+        plt.close(fig)
+        written.append(p)
+    print(f"PNG 快照：{len(written)} 张，写入 {outdir}")
+    return written
+
+
+def check_png(xlsx, outdir):
+    wb = openpyxl.load_workbook(xlsx)
+    want = sorted(png_name(sp["num"]) for sp in chart_specs(wb) if spec_has_data(sp))
+    have = sorted(f for f in (os.listdir(outdir) if os.path.isdir(outdir) else []) if PNG_RE.match(f))
+    ok = len(have) == len(want) and set(have) == set(want)
+    return ("9 PNG 快照数量 = 有数据的图数量", ok,
+            f"有数据的图 {len(want)} 张，{outdir} 里 PNG {len(have)} 张；缺 {sorted(set(want) - set(have)) or '无'}，"
+            f"多出 {sorted(set(have) - set(want)) or '无'}")
+
+
 def read_ref_mcap(path):
     out = {"_src": path}
     with open(path, encoding="utf-8-sig") as f:
@@ -1994,6 +2239,7 @@ def main(argv=None):
     ap.add_argument("--check", action="store_true", help="生成后按规格验收")
     ap.add_argument("--check-only", help="只验收已有的 xlsx，不重新生成")
     ap.add_argument("--checks-csv", help="把验收结果追加写入这个 CSV（汇总多家用）")
+    ap.add_argument("--png", metavar="目录", help="把图表总览的每张图导出为 PNG 快照到这个目录（每家公司一个目录）")
     a = ap.parse_args(argv)
     code = a.code.upper()
     sp = SPECIAL.get(code, {})
@@ -2013,8 +2259,16 @@ def main(argv=None):
         path = b.build(os.path.join(a.out, name))
         nchart = b.expected_charts
         print(f"已生成 {path}（{len(ex.years)} 个财年，{len(b.events)} 个股价事件，{nchart} 张图）")
+    png_dir = None
+    if a.png:
+        if export_png(path, a.png, code) is not None:
+            png_dir = a.png
+        else:
+            print("PNG 未导出，--check 不做第 9 项")
     if a.check or a.check_only:
         res = run_checks(path, ex, ref, nchart)
+        if png_dir:
+            res.append(check_png(path, png_dir))
         ok = print_checks(res, code)
         if a.checks_csv:
             new = not os.path.exists(a.checks_csv)
