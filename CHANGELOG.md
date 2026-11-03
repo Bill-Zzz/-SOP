@@ -2,6 +2,20 @@
 
 版本号规则：大版本.小版本.修订。流程或产出结构变化升小版本；脚本修复、陷阱补充升修订号；不兼容的重构升大版本。
 
+## 0.10.0 — 2026-11-04：company-dossier 更名为 research-sop，主题与行业可单独触发
+只改名字、触发说明和 D0 的单层交付规则；不改任何脚本逻辑，0.9.0 的规则内容（Google 格式交付、σ 门槛、图表可读性等）原样保留，不动"复用"设计。
+### 一、更名
+1. 技能 `company-dossier` 更名为 `research-sop`（中文标题"Research SOP：主题·行业·公司"），`git mv` 保留历史；frontmatter `name: research-sop`。
+2. 全仓库引用同步：脚本路径与 raw.githubusercontent 地址（`.../main/research-sop/scripts/...`）、根目录 README、`research-sop/PROMPT.md`、`prompts/README.md` 与 `模板_简短提示词.md`、`scripts/md2docx.py` 的 docstring 与命令行说明、`tests/run_tests.sh`。CHANGELOG 与 LESSONS 的历史条目保持原文。
+3. 旧目录占位：新建 `company-dossier/README.md`，写明更名日期、新目录、新脚本地址，以及旧提示词"按 company-dossier 技能做"改为"按 research-sop 技能做"。
+4. 三份 2026-11-02 提示词包正文不改，开头的注改为"本包为 company-dossier 时期的参考；技能已更名为 research-sop，推荐用 模板_简短提示词.md"。
+### 二、主题与行业可单独触发（research-sop SKILL.md，PROMPT.md 同步）
+1. 描述与文首说明覆盖三层：研究某个主题、某个行业、某家公司；行业横向比较；周期或趋势研究；完整研报；修订已交付的报告。
+2. "与 sellside-valuation-audit 的分工"：回答与产出两行改写，加一条"只要主题或行业研究也用本文件"。
+3. D0 新增第 3 步：用户只要主题或行业时，只写对应层，跳过公司层直接交付；不为此建公司历史数据表，行业横向比较用到的公司数字按来源分工取，已有公司历史数据表的直接引用；年化波动率、最大回撤两列用 futu_export 日线自算。原第 3 步顺延为第 4 步。
+4. 三层结构"顺序固定"后补："只要上层时可以只交付上层；要公司层时下层必须引用上层。"
+5. 简短提示词改为"按 research-sop 技能 0.10.0 做"，并加只做行业、只做主题的一行示例。
+
 ## 0.9.0 — 2026-11-04：Google 格式交付、股价行为画像与 σ 门槛、图表可读性
 只改规则文字，不改任何脚本。不动"复用"相关设计（索引、冻结、--prev、共享摘要卡），留给下一版。
 ### 一、交付一律 Google 格式（company-dossier SKILL.md，PROMPT.md 同步）

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""把 company-dossier 报告的 .md 转成 .docx（报告只写一遍：AI 只写 .md，.docx 由本脚本生成）。
+"""把 research-sop 报告的 .md 转成 .docx（报告只写一遍：AI 只写 .md，.docx 由本脚本生成）。
 
 用法：
   python3 md2docx.py 输入.md --out 输出.docx [--img-root 目录]
@@ -417,7 +417,7 @@ def convert(blocks, img_root, out):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="报告 .md → .docx（company-dossier 样式），附检查")
+    ap = argparse.ArgumentParser(description="报告 .md → .docx（research-sop 样式），附检查")
     ap.add_argument("md")
     ap.add_argument("--out", help="输出 .docx 路径")
     ap.add_argument("--img-root", help="图片相对路径的根目录（默认为 .md 所在目录）")

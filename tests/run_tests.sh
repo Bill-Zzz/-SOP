@@ -96,7 +96,7 @@ fi
 
 echo "== 5. 历史数据 Excel 脚本 =="
 python3 tests/make_history_fixture.py "$TMP/futu" >/dev/null
-python3 company-dossier/scripts/build_history_xlsx.py ACME --root "$TMP/futu" --out "$TMP/hist" --ai 测试 --check \
+python3 research-sop/scripts/build_history_xlsx.py ACME --root "$TMP/futu" --out "$TMP/hist" --ai 测试 --check \
   | tee "$TMP/hist.txt"
 grep -q "结果：8/8 通过" "$TMP/hist.txt"
 grep -q "股数口径：基本加权股数 5 年、期末股数 1 年" "$TMP/hist.txt"
@@ -126,7 +126,7 @@ assert "未采用" in str(vs.cell(row[2023], h["备注"]).value), "量级不对�
 print("历史数据 Excel：17 张表、13 张图、近 12 季、股价事件、公式、市值股数口径均正确")
 EOF
 if python3 -c "import matplotlib" 2>/dev/null; then
-  python3 company-dossier/scripts/build_history_xlsx.py ACME --root "$TMP/futu" --check-only "$TMP"/hist/*_ACME_历史数据_v1_测试.xlsx \
+  python3 research-sop/scripts/build_history_xlsx.py ACME --root "$TMP/futu" --check-only "$TMP"/hist/*_ACME_历史数据_v1_测试.xlsx \
     --png "$TMP/png" | tee "$TMP/png.txt"
   grep -q "结果：9/9 通过" "$TMP/png.txt"
   grep -q "跳过：图 2 无数据" "$TMP/png.txt"
@@ -148,9 +148,9 @@ python3 -c "import docx" 2>/dev/null || pip install -q python-docx --break-syste
 mkdir -p "$TMP/md/fig"
 cp tests/fixtures/md2docx_sample.md "$TMP/md/"
 python3 -c "from PIL import Image; Image.new('RGB', (1600, 800), (78, 121, 167)).save('$TMP/md/fig/图01_营收与增速.png', dpi=(200, 200))"
-python3 company-dossier/scripts/md2docx.py "$TMP/md/md2docx_sample.md" --out "$TMP/md/out.docx" | tee "$TMP/md.txt"
+python3 research-sop/scripts/md2docx.py "$TMP/md/md2docx_sample.md" --out "$TMP/md/out.docx" | tee "$TMP/md.txt"
 grep -q "标题 6（一级 1 / 二级 3 / 三级 2）；表格 2；图片 1" "$TMP/md.txt"
-if python3 company-dossier/scripts/md2docx.py "$TMP/md/md2docx_sample.md" --check-only --img-root "$TMP/nowhere" \
+if python3 research-sop/scripts/md2docx.py "$TMP/md/md2docx_sample.md" --check-only --img-root "$TMP/nowhere" \
     >/dev/null 2>"$TMP/md_err.txt"; then
   echo "缺图时应以非零码退出"; exit 1
 fi

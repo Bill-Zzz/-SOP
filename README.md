@@ -33,24 +33,25 @@ scripts/
 templates/      阅读包、研究方向讨论、模型规格、报告大纲、出处台账、核查报告、修订记录、复盘
 examples/crwv/  CoreWeave 案例
 tests/          自检（GitHub Actions 自动运行）
-company-dossier/        第二个 skill：公司档案研究（不建模、不停下、禁止点预测）
+research-sop/           第二个 skill：Research SOP，主题·行业·公司研究（不建模、不停下、禁止点预测；0.10.0 前名为 company-dossier）
   SKILL.md              方法：范围 → 检索 → 阅读 → 主题/行业/公司三层写作 → 自检 → 交付 → 复盘
   PROMPT.md             精简版，粘贴到对话式 AI（必须联网）
   scripts/              build_history_xlsx.py（历史数据 Excel，--png 导出图表快照）、md2docx.py（报告 .md → .docx）
   templates/            公司报告、行业报告、主题报告模板；股价事件台账、历史节点台账
   prompts/              可直接发给其他 AI 的提示词包（公司清单、主题报告）
+company-dossier/        旧目录占位，只有 README.md：说明已更名为 research-sop 及新脚本地址
 ```
 
 ## 两个 skill 怎么选
 | 想要 | 用 |
 |---|---|
-| 一次读懂一家公司：历史、团队、股价事件、历史估值、未来利好利空、行业位置 | `company-dossier/`（全自动，不停下；未来只给方向和量级） |
+| 研究一个主题或一个行业（含行业横向比较、周期或趋势），或一次读懂一家公司：历史、团队、股价事件、历史估值、未来利好利空、行业位置 | `research-sop/`（全自动，不停下；只要主题或行业时只写对应层；未来只给方向和量级） |
 | 这家公司值多少钱、核查券商或自建模型 | 根目录 `SKILL.md`（sellside-valuation-audit，A3 停下讨论方向） |
-| 两者都要 | 先 company-dossier，再把档案报告作为输入交给 sellside-valuation-audit |
+| 两者都要 | 先 research-sop，再把档案报告作为输入交给 sellside-valuation-audit |
 
 Claude Code 安装第二个 skill：
 ```bash
-ln -s "$(pwd)/company-dossier" ~/.claude/skills/company-dossier
+ln -s "$(pwd)/research-sop" ~/.claude/skills/research-sop
 ```
 
 ## 安装
