@@ -7,7 +7,9 @@
 #   5) 历史数据 Excel 脚本：用虚构公司 ACME 的最小长表生成工作簿并跑 --check（含格式规范 Part B 第 9–12 项）；
 #      --png 导出图表快照
 #   6) md2docx.py：示例 .md（摘要、目录、编号问题、单位表头、合计行、现场生成的占位 PNG、注释、附录）转 .docx，
-#      检查输出（含标题编号与格式规范 Part A 格式检查）并读回核对
+#      检查输出（含标题编号、卷首与文末、图号与文件名、格式规范 Part A 格式检查）并读回核对
+#   7) check_delivery.py：用 rclone lsjson 样例 JSON（tests/fixtures/check_delivery_*.json）离线核对 Drive 布局、
+#      命名、格式，并核对本地 成品/、留痕/复用、复核；不联网
 # 用法：bash tests/run_tests.sh   （在仓库根目录运行）
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -170,6 +172,24 @@ assert not any(f.startswith(("图02_", "图12_", "图13_")) for f in fs), "第�
 assert all(os.path.getsize(os.path.join(sys.argv[1], f)) > 5000 for f in fs)
 print("--png：10 张有数据的图已导出，第二层未填的 3 张跳过，编号与图表总览一致")
 EOF
+  python3 - "$TMP"/hist/*_ACME_历史数据_v1_测试.xlsx "$TMP/png_t" <<'EOF'
+import sys
+sys.path.insert(0, "research-sop/scripts")
+import matplotlib
+matplotlib.use("Agg")
+from matplotlib.axes import Axes
+seen, orig = [], Axes.set_title
+def rec(self, label, *a, **k):
+    seen.append(label)
+    return orig(self, label, *a, **k)
+Axes.set_title = rec
+import build_history_xlsx as B
+B.export_png(sys.argv[1], sys.argv[2], "ACME")
+assert len(seen) == 10, seen
+bad = [t for t in seen if t.lstrip().startswith("图") or t.lstrip()[:1].isdigit()]
+assert not bad, f"图内标题不应写图号（图 N 只在文档图注里）：{bad}"
+print("--png：图内标题不写图号，10 张均只写标题")
+EOF
 else
   SKIPPED+=("--png 导出测试（未安装 matplotlib）")
 fi
@@ -178,7 +198,7 @@ echo "== 6. md2docx.py =="
 python3 -c "import docx" 2>/dev/null || pip install -q python-docx --break-system-packages
 mkdir -p "$TMP/md/fig"
 cp tests/fixtures/md2docx_sample.md "$TMP/md/"
-python3 -c "from PIL import Image; Image.new('RGB', (1600, 800), (78, 121, 167)).save('$TMP/md/fig/图01_营收与增速.png', dpi=(200, 200))"
+python3 -c "from PIL import Image; Image.new('RGB', (1600, 800), (78, 121, 167)).save('$TMP/md/fig/fig1_营收与增速.png', dpi=(200, 200))"
 python3 research-sop/scripts/md2docx.py "$TMP/md/md2docx_sample.md" --out "$TMP/md/out.docx" --date 2026-11-04 \
   | tee "$TMP/md.txt"
 grep -q "标题 9（报告标题 1 / 一级 5 / 二级 2 / 三级 1）；表格 2；图片 1" "$TMP/md.txt"
@@ -187,11 +207,63 @@ grep -q "标题编号（只检查不改写）：正文一级 2、二级 2、三�
 grep -q "「1.2 同行比较」：编号与标题之间缺全角空格" "$TMP/md.txt"
 grep -q "「三、未来：利好与利空」：跳号或错号，应为「二、」" "$TMP/md.txt"
 grep -q "格式检查（格式规范 Part A，读回 .docx 逐项比）：10/10 通过" "$TMP/md.txt"
+grep -q "卷首与文末（只检查不改写）：问题 1 处" "$TMP/md.txt"
+grep -q "文末没有以'口径与说明'为题的一节" "$TMP/md.txt"
+grep -q "图号与文件名（只检查不改写）：图片 1 张；问题 0 处" "$TMP/md.txt"
+python3 - "$TMP/md" <<'EOF'
+import sys
+from PIL import Image
+d = sys.argv[1]
+for n in (1, 2, 3):
+    Image.new("RGB", (800, 400), (78, 121, 167)).save(f"{d}/fig/fig{n}_样例.png")
+def doc(imgs, ref=""):
+    body = "".join(f"![图 {a}　结论 {a}](fig/fig{f}_样例.png)\n\n数据与可编辑图表：样例 图表总览第 {f} 图\n\n" for a, f in imgs)
+    return f"# 图号样例\n\n## 一页摘要\n\n摘要。{ref}\n\n## 一、正文\n\n{body}## 附一、口径与说明\n\n说明。\n"
+open(d + "/fig_order_bad.md", "w", encoding="utf8").write(doc([(2, 2), (1, 1), (3, 3)]))
+open(d + "/fig_order_good.md", "w", encoding="utf8").write(doc([(1, 1), (2, 2), (3, 3)], "见图 3。"))
+open(d + "/fig_file_bad.md", "w", encoding="utf8").write(doc([(1, 1), (2, 1)], "见图 4。"))
+EOF
+python3 research-sop/scripts/md2docx.py "$TMP/md/fig_order_bad.md" --check-only --img-root "$TMP/md" > "$TMP/fig_bad.txt"
+grep -q "图号与文件名（只检查不改写）：图片 3 张；问题 2 处" "$TMP/fig_bad.txt"
+grep -q "第 1 张图标为'图 2'：图号应按出现顺序编，这里应为图 1" "$TMP/fig_bad.txt"
+grep -q "第 2 张图标为'图 1'：图号应按出现顺序编，这里应为图 2" "$TMP/fig_bad.txt"
+python3 research-sop/scripts/md2docx.py "$TMP/md/fig_order_good.md" --check-only --img-root "$TMP/md" > "$TMP/fig_good.txt"
+grep -q "图号与文件名（只检查不改写）：图片 3 张；问题 0 处" "$TMP/fig_good.txt"
+python3 research-sop/scripts/md2docx.py "$TMP/md/fig_file_bad.md" --check-only --img-root "$TMP/md" > "$TMP/fig_file.txt"
+grep -q "图注'图 2'与文件名 fig1（fig1_样例.png）不一致" "$TMP/fig_file.txt"
+grep -q "正文引用了'图 4'，但全文只有 2 张图" "$TMP/fig_file.txt"
+echo "图号与文件名：顺序 2,1,3 报错、1,2,3 通过、图 2 配 fig1 报错、引用超出图总数报错"
+python3 - "$TMP/md" <<'EOF'
+import sys
+d = sys.argv[1]
+s = open(d + "/md2docx_sample.md", encoding="utf8").read()
+rev = "## 修订说明\n\n| 位置 | 原版 | 修订 | 结论是否改变 |\n|---|---|---|---|\n| 一 | 旧 | 新 | 否 |\n"
+meta = "2026-11-04 · 测试 · 版本 V2.0 · 数据截至 2026-09-30\n\n口径：亿美元。本报告不构成投资建议。\n\n"
+end = "## 附三、口径与说明\n\n" + meta
+title = "# ACME 公司档案（测试样例）\n"
+open(d + "/front_bad.md", "w", encoding="utf8").write(s.replace(title, title + "\n" + meta + rev, 1))
+open(d + "/front_good.md", "w", encoding="utf8").write(s.rstrip("\n") + "\n\n" + end + rev)
+open(d + "/rev_wrong.md", "w", encoding="utf8").write(s.rstrip("\n") + "\n\n" + rev + "\n" + end)
+EOF
+python3 research-sop/scripts/md2docx.py "$TMP/md/front_bad.md" --check-only --img-root "$TMP/md" > "$TMP/fb_bad.txt"
+grep -q "卷首与文末（只检查不改写）：问题 3 处" "$TMP/fb_bad.txt"
+grep -q "卷首含元信息，应移至文末'附：口径与说明'（标题与一页摘要之间 3 段" "$TMP/fb_bad.txt"
+grep -q "'修订说明'在一页摘要之前，应移至文末、排在'附：口径与说明'之后" "$TMP/fb_bad.txt"
+python3 research-sop/scripts/md2docx.py "$TMP/md/rev_wrong.md" --check-only --img-root "$TMP/md" > "$TMP/fb_wrong.txt"
+grep -q "'修订说明'应排在'附：口径与说明'之后、作为最后一节" "$TMP/fb_wrong.txt"
+python3 research-sop/scripts/md2docx.py "$TMP/md/front_good.md" --out "$TMP/md/front_good.docx" --date 2026-11-04 > "$TMP/fb_good.txt"
+grep -q "卷首与文末（只检查不改写）：问题 0 处" "$TMP/fb_good.txt"
+grep -q "格式检查（格式规范 Part A，读回 .docx 逐项比）：10/10 通过" "$TMP/fb_good.txt"
+for t in theme industry company; do
+  python3 research-sop/scripts/md2docx.py research-sop/templates/${t}_report.md --check-only --img-root "$TMP/nowhere" 2>/dev/null \
+    | grep -q "卷首与文末（只检查不改写）：问题 0 处" || { echo "模板 ${t}_report.md 卷首与文末应为 0 处问题"; exit 1; }
+done
+echo "卷首与文末：元信息与修订说明在卷首、修订说明排在口径与说明之前都报出；合规写法 0 处、格式检查 10/10；三份模板 0 处"
 if python3 research-sop/scripts/md2docx.py "$TMP/md/md2docx_sample.md" --check-only --img-root "$TMP/nowhere" \
     >/dev/null 2>"$TMP/md_err.txt"; then
   echo "缺图时应以非零码退出"; exit 1
 fi
-grep -q "fig/图01_营收与增速.png" "$TMP/md_err.txt"
+grep -q "fig/fig1_营收与增速.png" "$TMP/md_err.txt"
 python3 - "$TMP/md/out.docx" <<'EOF'
 import sys
 import docx
@@ -235,6 +307,37 @@ body = "\n".join(p.text for p in d.paragraphs)
 assert "[R01234 p5]" in body and "**" not in body
 print("md2docx：A4 页面、页眉页脚、摘要→目录→正文分页、标题层级与字号、单位表头、合计行、列宽、注释、表题、缺图报错均正确")
 EOF
+
+echo "== 7. check_delivery.py（离线，lsjson 样例） =="
+python3 research-sop/scripts/check_delivery.py --help | grep -q -- "--drive"
+mkdir -p "$TMP/task/成品" "$TMP/task/留痕/ACME/复用" "$TMP/task/留痕/ACME/复核"
+touch "$TMP/task/成品/ACME_库存周期研究_20261105_V1.0.md" "$TMP/task/留痕/ACME/复用/结论卡.md" \
+  "$TMP/task/留痕/ACME/复用/来源清单.csv" "$TMP/task/留痕/ACME/复用/数字台账.csv" "$TMP/task/留痕/ACME/复核/自检.md"
+python3 research-sop/scripts/check_delivery.py --lsjson tests/fixtures/check_delivery_good.json --local "$TMP/task" \
+  | tee "$TMP/cd_good.txt"
+grep -q "结果：14/14 通过" "$TMP/cd_good.txt"
+grep -q "Google 文档）（2 份）" "$TMP/cd_good.txt"
+grep -q "PNG 只在 底稿/图片/ 下（2 张）" "$TMP/cd_good.txt"
+grep -q "1 篇：ACME；另有 底稿说明、共用数据/" "$TMP/cd_good.txt"
+rm -r "$TMP/task/留痕/ACME/复核" "$TMP/task/留痕/ACME/复用/数字台账.csv"
+if python3 research-sop/scripts/check_delivery.py --lsjson tests/fixtures/check_delivery_bad.json --local "$TMP/task" \
+    > "$TMP/cd_bad.txt"; then
+  echo "不合规的交付应以非零码退出"; exit 1
+fi
+cat "$TMP/cd_bad.txt"
+for s in "结果：2/14 通过" "      - 20261105_库存周期_v1_ClaudeCode" "      - ACME_库存周期研究_20261105_v1" \
+    "ACME_图表数据_20261105_V1.0.xlsx：xlsx 原件" "      - 报告/" "底稿/ACME/ 缺 自检" \
+    "底稿/ACME/结论卡.md：结论卡应为 Google 文档，现为 md 原件" "底稿/ACME/数字台账.csv：数字台账应为 Google 表格，现为 csv 原件" \
+    "      - 底稿/ACME/图02_分部.png" "底稿/图片/XYZ/：没有同名的 底稿/XYZ/" "底稿/图片/图03_现金流.png：应放进 底稿/图片/<篇>/" \
+    "      - 底稿/ACME/raw/" "留痕/ACME/ 缺 复核/" "留痕/ACME/ 缺 数字台账" \
+    "底稿/共用/ 缺 结论卡、自检、来源清单、数字台账" "底稿/共用数据/价格序列.csv：csv 原件" \
+    "底稿/ACME_底稿说明_补充.docx：应放进 底稿/<篇>/" "底稿/数字台账.xlsx：应放进 底稿/<篇>/"; do
+  grep -qF -- "$s" "$TMP/cd_bad.txt" || { echo "缺少预期输出：$s"; exit 1; }
+done
+if grep -q "共用数据/ 缺\|ACME_底稿说明_20261105" "$TMP/cd_bad.txt"; then echo "共用数据/ 不按篇要求四类、第一份底稿说明应放行"; exit 1; fi
+if grep -q "来源清单.xlsx" "$TMP/cd_bad.txt"; then echo "无元数据、Size -1 的 .xlsx 应认作 Google 表格"; exit 1; fi
+if grep -q "10-K_2025.pdf\|IR页面存档" "$TMP/cd_good.txt"; then echo "来源/ 里的原件应原样放行"; exit 1; fi
+echo "check_delivery：合规样例（含底稿说明、共用数据/）14/14 通过；不合规样例逐项报出命名、原件、自创文件夹、底稿/ 根下散文件、缺件（含 共用数据/ 之外的文件夹）、格式（含 共用数据/）、PNG 位置、raw、本地缺 复核/ 与数字台账，退出码 1"
 
 echo
 if [ ${#SKIPPED[@]} -gt 0 ]; then
