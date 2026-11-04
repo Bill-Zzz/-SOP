@@ -9,7 +9,8 @@ Bill 提供的两份规范原文放进 `research-sop/standards/`：`存储规范
 3. 图表配色从 `dataviz` 技能改为格式规范固定色板（#17365D / #5B9BD5 / #A6A6A6 / #70AD47 / #C00000 / #ED7D31）；"图表可读性"的颜色条同步。
 4. 注释小字颜色统一为灰色 #666666；D4 加一句"格式按格式规范第 15 节审阅"。
 5. 历史数据表格上传后按存储规范命名（如 `AAPL_历史数据_20261104`），本地中间件名不变。
-6. 脚本未改：`md2docx.py`、`build_history_xlsx.py` 只覆盖部分格式，其余暂由 AI 在 Google 格式里补齐；脚本适配待做（含 `build_history_xlsx.py` 里"股数（百万股）"改中文单位）。
+6. 网格线放在柱子和折线后面，不压在数据上（Bill 看到旧图网格线把柱子切出白条后要求）；格式规范第 7、13 节与"图表可读性"同步。
+7. 脚本未改：`md2docx.py`、`build_history_xlsx.py` 只覆盖部分格式，其余暂由 AI 在 Google 格式里补齐；脚本适配待做（含 `build_history_xlsx.py` 里"股数（百万股）"改中文单位）。
 
 ## 0.11.1 — 2026-11-04：彻底解耦，不再点名 Drive 里的文件
 research-sop 里删去所有"按 Drive 根目录《00_先读我》""按入口文件"的引用（SKILL.md、PROMPT.md、templates、prompts），统一为文首一句：本技能只管怎么研究、怎么写、怎么检查，不管东西放在哪；用 Google Drive 时，按 Drive 里的规则做。
