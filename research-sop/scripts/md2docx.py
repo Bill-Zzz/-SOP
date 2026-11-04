@@ -6,8 +6,9 @@
   python3 md2docx.py 输入.md --check-only [--img-root 目录]      只做检查，不输出 docx
 
 标题层级：.md 只有一个 # 且它是第一个标题时，# 是报告标题（Title 样式），##、###、#### 依次为一、二、三级标题
-（Heading 1/2/3）；否则 #、##、### 直接为一、二、三级。一级标题里含"摘要"的（一页摘要）与"目录"用独立样式，
-不进目录、不计编号；以"附"开头的是附录，含"修订说明 / 修订记录"的是修订说明，二者照常进目录、另起一页，按自己的编号体系。
+（Heading 1/2/3）；否则 #、##、### 直接为一、二、三级。"目录"用独立样式，不进目录、不计编号；"一、结论与概述"是
+正文第一章，照常编号；以"附"开头的是附录，照常进目录、另起一页，按自己的编号体系。旧稿里第一个正文章之前含"摘要"的
+一级标题（一页摘要）仍用独立样式，含"修订说明 / 修订记录"的仍另起一页，但"报告外壳"检查会报。
 
 版式（standards/格式规范.md Part A）：
   页面    A4 纵向，四边 2 cm，单栏；页眉左报告名、右"代码 · 日期"（报告名取 --title 或报告标题；代码、日期取
@@ -16,8 +17,8 @@
   字体    西文与数字 Arial、中文 Noto Sans SC（rFonts 的 ascii/hAnsi 与 eastAsia 分设，正文样式层统一配置）；正文
           10.5 pt，行距 1.25，段后 6 pt；一、二、三级标题 18 / 14 / 12 pt 加粗黑色，段前段后 16/8、12/6、8/4 pt，行距 1.0。
   注释    以"表注""图注""来源""资料来源""数据与可编辑图表""口径说明""注："开头的段落与图片的图注：9 pt 灰色 #666666。
-  顺序    报告标题 → 一页摘要 → 目录（Word 目录域 TOC \\o "1-2" \\h，打开时更新）→ 正文；目录、正文各一级板块、附录、
-          修订说明另起一页（段前分页）。
+  顺序    报告标题 → 目录（Word 目录域 TOC \\o "1-2" \\h，打开时更新）→ 一、结论与概述 → 各章 → 附：口径与说明；
+          目录、正文各一级板块、附录另起一页（段前分页）。
   表格    真表格；表头底色 #17365D、白字 10.5 pt 加粗、水平垂直居中，"指标（单位）"把全角括号里的单位软换行到下一行、
           9 pt 常规；表体 10.5 pt、白底、段后 0、边框 #D9D9D9 0.5 pt、内边距 4 pt；数值、日期、编号、评级居中，
           文本左对齐（说明文字行距 0.85，其余 1.25），垂直顶端；首格为"合计 / 总计"的行加粗、加上边框；表宽 = 版心
@@ -29,15 +30,18 @@
 
 支持的 Markdown：标题、普通段落、**粗体**、*斜体*、`代码`、[文字](链接)、无序 / 有序列表（缩进两格以上为第二级）、
 管道表格（单元格内 <br> 换行）、图片 ![图注](路径)（居中、宽度不超过 15 cm，图注另起一段）、> 引用段、``` 代码块。
-水平线与 HTML 注释忽略；方括号来源标注如 [R01234 p5] 原样保留。
+水平线与 HTML 注释忽略；方括号来源标注如 [R01234 p5] 原样保留（但"出处标注"检查会报：正文应零标注）。
 
 检查（每次都做，打印到 stdout）：标题、表格、图片数量；表格行的列数与表头不一致的；图下是否注明"数据与可编辑图表"；
+图下来源行（只检查不改写：来源行或"数据与可编辑图表"行带 R / S 编号或页码的报出，来源行只写数据提供方与口径）；
 标题编号（只检查不改写：一级"一、"连续、二级"1.1　"父级前缀与序号连续且后接全角空格、三级"1.1.1"，附录"附一、"连续；
-报错号、跳号、重号、缺编号、缺全角空格）；表头单位（半角括号、数值列表头缺单位）；卷首与文末（只检查不改写：报告标题与
-"一页摘要"之间有一个以上的段落、表格或列表，或有一段像元信息——含"数据截至""不构成投资建议""口径："或用"·"串起
-日期、作者、版本——报"卷首含元信息"；一页摘要之前出现修订说明或其他一节也报；文末最后一个一级板块不是"附：口径与说明"
-（修订版只允许修订说明排在它后面）也提示）；图号与文件名（只检查不改写：图注"图 N"按出现顺序 1、2、3……严格递增，
-图片文件名里的 figN 与图号一致，正文引用的"图 N"不超过图总数）。生成 .docx 后读回逐项核对格式
+报错号、跳号、重号、缺编号、缺全角空格）；表头单位（半角括号、数值列表头缺单位）；报告外壳（只检查不改写：报告标题与
+第一个一级标题之间有段落、表格或列表；标题后第一个一级标题不含"结论与概述"；其下没有"结论""概述"两个子标题或以
+**结论** / **概述** 开头的加粗段；最后一个一级标题不是"口径与说明"；任何一级出现"一页摘要""修订说明""本报告的取舍"
+"来源"作为节标题——都报出）；出处标注与过程用语（只检查不改写：正文——不含图下"数据与可编辑图表"行与代码块——里的
+"[R数字""[S数字""p数字]"和"研报库""台账""对账""取证"，报总数并按所在标题列出）；
+图号与文件名（只检查不改写：图注"图 N"按出现顺序 1、2、3……严格递增，图片文件名里的 figN 与图号一致，
+正文引用的"图 N"不超过图总数）。生成 .docx 后读回逐项核对格式
 （页面、页眉页脚、字体字号行距、标题、注释、目录域与分页、表格底色边框内边距对齐合计行列宽），打印"格式检查：x/y 通过"。
 .md 里的图片文件不存在时列出并以非零码退出（不输出 docx）；格式检查有不通过项时退出码 1。
 
@@ -1129,47 +1133,92 @@ def slim(doc):
 
 # ---------------------------------------------------------------- 检查
 RE_META = re.compile(r"数据截至|不构成投资建议|^口径[:：]|^\S.*·.*·")
+RE_HEAD_PREFIX = re.compile(rf"^(?:附{CN}?[、：:.．\s　]*|{CN}、|\d+(?:\.\d+)*[\s　]*)")
+# 出处标注与过程用语：[R123 p5]、[S01]、p5]、研报库、台账、对账、取证（写法硬要求 1）
+RE_CITE = re.compile(r"\[[RS]\d+[^\]\n]*\]|\[[RS]\d+|p\.?\s?\d+\]|研报库|台账|对账|取证")
+# 图下来源行里的研报 / 公开资料编号与页码
+RE_SRC_ID = re.compile(r"(?<![A-Za-z0-9])[RS]\d{2,}|(?<![A-Za-z0-9])p\.?\s?\d+(?!\d)|第\s*\d+\s*页")
 
 
-def check_front_back(blocks, heads):
-    """格式规范第 2 节：标题后直接进一页摘要；日期、作者、版本、数据截至、口径与免责声明放文末"附：口径与说明"，
-    修订版的修订说明表排在它之后、作为最后一节。只检查不改写。"""
+def head_core(text):
+    """去掉标题的编号前缀（一、 / 1.1　 / 附一、 / 附：），只留标题文字。"""
+    return RE_HEAD_PREFIX.sub("", text, count=1).strip()
+
+
+def check_shell(blocks, heads):
+    """格式规范第 2 节报告外壳：标题 → 一、结论与概述（下有结论、概述）→ 任务书定的各章 → 附：口径与说明；
+    不设一页摘要，取舍、来源、修订说明进底稿。只检查不改写。"""
     issues = []
-    is_rev = lambda h: "修订说明" in h["text"] or "修订记录" in h["text"]
-    h1 = [h for h in heads if h["level"] == 1]
-    summary = next((h for h in h1 if "摘要" in h["text"]), None)
+    h1 = [h for h in heads if h["level"] == 1 and h["role"] != "toc"]
     title = next((h for h in heads if h["level"] == 0), None)
-    if summary:
-        start = title["idx"] + 1 if title and title["idx"] < summary["idx"] else 0
-        front_h = [h for h in heads if start <= h["idx"] < summary["idx"] and h["level"] >= 1]
-        front = [b for b in blocks[start:summary["idx"]] if b[0] != "h"]
-        meta = [b for b in front if b[0] in ("p", "quote") and RE_META.search(plain(b[1]))]
-        if len(front) > 1 or meta:
-            first = plain(front[0][1]) if front[0][0] in ("p", "quote") else front[0][0]
-            issues.append(f"卷首含元信息，应移至文末'附：口径与说明'（标题与一页摘要之间 {len(front)} 段，"
-                          f"首段「{first[:30]}」）")
-        for h in front_h:
-            if is_rev(h):
-                issues.append(f"'{h['text']}'在一页摘要之前，应移至文末、排在'附：口径与说明'之后")
-            else:
-                issues.append(f"标题与一页摘要之间有一节'{h['text']}'，标题后应直接进一页摘要")
-    after = [h for h in h1 if not summary or h["idx"] > summary["idx"]]
-    n_rev = 0
-    while after and is_rev(after[-1]):
-        after.pop()
-        n_rev += 1
-    for h in after:
-        if is_rev(h):
-            issues.append(f"'{h['text']}'应排在'附：口径与说明'之后、作为最后一节")
-    tail = [h for h in h1 if "口径与说明" in h["text"]]
-    if not tail:
-        issues.append("文末没有以'口径与说明'为题的一节（附录最后放'附：口径与说明'：日期、作者、版本、数据截至、"
-                      "口径与免责声明；修订版的修订说明表排在它之后）")
-    elif not after or after[-1] is not tail[-1]:
-        last = after[-1]["text"] if after else "无"
-        issues.append(f"'{tail[-1]['text']}'应为最后一节，只有修订说明可以排在它后面（现在它后面是'{last}'）")
+    if not h1:
+        return ["没有一级标题：标题后应为'一、结论与概述'，最后一节为'附：口径与说明'"]
+    first = h1[0]
+    start = title["idx"] + 1 if title and title["idx"] < first["idx"] else 0
+    front = [b for b in blocks[start:first["idx"]] if b[0] != "h"]
+    if front:
+        lead = plain(front[0][1]) if front[0][0] in ("p", "quote") else front[0][0]
+        meta = any(b[0] in ("p", "quote") and RE_META.search(plain(b[1])) for b in front)
+        issues.append(f"标题与第一章之间有 {len(front)} 段（首段「{lead[:30]}」），标题后应直接进'一、结论与概述'"
+                      + ("；元信息放'附：口径与说明'" if meta else ""))
+    if "结论与概述" not in first["text"]:
+        issues.append(f"标题后第一个一级标题应为'一、结论与概述'，现为'{first['text']}'")
+    else:
+        end = h1[1]["idx"] if len(h1) > 1 else len(blocks)
+        subs = [head_core(h["text"]) for h in heads if first["idx"] < h["idx"] < end and h["level"] >= 2]
+        bolds = [b[1] if b[0] in ("p", "quote") else b[1][1] for b in blocks[first["idx"] + 1:end]
+                 if b[0] in ("p", "quote", "ul", "ol")]
+        for need in ("结论", "概述"):
+            if not any(t.startswith(need) for t in subs) and \
+                    not any(re.match(rf"\s*\*\*{need}", t) for t in bolds):
+                issues.append(f"'{first['text']}'下缺'{need}'：应有'{need}'子标题或以 **{need}** 开头的加粗段")
+    last = h1[-1]
+    if not any("口径与说明" in h["text"] for h in h1):
+        issues.append("文末没有'附：口径与说明'一节（口径、数据截至、版本、免责声明放这里）")
+    elif "口径与说明" not in last["text"]:
+        issues.append(f"最后一节应为'附：口径与说明'，现为'{last['text']}'")
+    for h in heads:
+        if h["level"] < 1 or h["role"] == "toc":
+            continue
+        t, core = h["text"], head_core(h["text"])
+        if "一页摘要" in t or (h["level"] == 1 and core.startswith("摘要")):
+            issues.append(f"'{t}'作为节标题出现：不设一页摘要，改写为'一、结论与概述'")
+        elif "修订说明" in t or "修订记录" in t:
+            issues.append(f"'{t}'作为节标题出现在正文：修订说明进底稿 复核/修订说明_Vx.md")
+        elif "本报告的取舍" in t or core.startswith("取舍"):
+            issues.append(f"'{t}'作为节标题出现在正文：取舍进底稿")
+        elif core.startswith("来源"):
+            issues.append(f"'{t}'作为节标题出现在正文：来源清单进底稿")
     return issues
 
+
+def check_citations(blocks, heads):
+    """写法硬要求 1：正文零出处标注。查 [R… / [S… / p…] 与"研报库""台账""对账""取证"，
+    不查图下"数据与可编辑图表"行和代码块。只检查不改写。返回 (总数, [(所在标题, [命中…])])。"""
+    hmap = {h["idx"]: h["text"] for h in heads}
+    where, hits, order = "（标题前）", {}, []
+    for k, b in enumerate(blocks):
+        if b[0] == "h":
+            where = hmap.get(k, plain(b[1][1]))
+            texts = [b[1][1]]
+        elif b[0] in ("p", "quote"):
+            texts = [] if plain(b[1]).startswith("数据与可编辑图表") else [b[1]]
+        elif b[0] in ("ul", "ol"):
+            texts = [b[1][1]]
+        elif b[0] == "table":
+            texts = list(b[1]["head"]) + [c for _, r in b[1]["rows"] for c in r]
+        elif b[0] == "img":
+            texts = [b[1]["alt"]]
+        else:
+            continue
+        for t in texts:
+            found = RE_CITE.findall(plain(t))
+            if found:
+                if where not in hits:
+                    hits[where] = []
+                    order.append(where)
+                hits[where].extend(found)
+    return sum(len(v) for v in hits.values()), [(w, hits[w]) for w in order]
 
 RE_FIG_NO = re.compile(r"^\s*图\s*(\d+)")
 RE_FIG_FILE = re.compile(r"fig0*(\d+)", re.I)
@@ -1232,19 +1281,25 @@ def check(blocks, img_root):
             elif (body and all(re.fullmatch(r"[-−+]?\(?[-−+]?\d[\d,]*(\.\d+)?\)?", x) for x in body)
                   and split_head(hd)[1] is None and not re.search(r"年|日期|期间|编号|代码|序号|年度|季度", ph)):
                 unit_issues.append(f"表 {ti}「{ph}」：数值列表头没有标单位")
-    no_src = []
+    no_src, src_ids = [], []
     for k, b in enumerate(blocks):
         if b[0] != "img":
             continue
         nxt = [x for x in blocks[k + 1:k + 4] if x[0] in ("p", "quote")]
-        if not any("数据与可编辑图表" in x[1] or plain(x[1]).startswith(("来源", "资料来源")) for x in nxt):
+        srcs = [plain(x[1]) for x in nxt if "数据与可编辑图表" in x[1] or plain(x[1]).startswith(("来源", "资料来源"))]
+        if not srcs:
             no_src.append(b[1]["path"])
+        for t in srcs:
+            if RE_SRC_ID.search(t):
+                src_ids.append(f"{os.path.basename(b[1]['path'])} 的来源行带研报编号或页码：「{t[:40]}」，"
+                               "来源行只写数据提供方与口径")
     lv = {n: sum(1 for h in heads if h["level"] == n) for n in (0, 1, 2, 3)}
     num_issues, ncount = check_numbering(heads)
     return {"heads": len(heads), "lv": lv, "tables": len(tables), "imgs": len(imgs), "missing": missing,
             "bad_rows": bad_rows, "no_src": no_src, "title_mode": title_mode, "outline": heads,
             "num_issues": num_issues, "ncount": ncount, "unit_issues": unit_issues,
-            "fb_issues": check_front_back(blocks, heads), "fig_issues": check_figures(blocks)[1]}
+            "shell_issues": check_shell(blocks, heads), "cite": check_citations(blocks, heads),
+            "src_ids": src_ids, "fig_issues": check_figures(blocks)[1]}
 
 
 def verify_docx(path, expect):
@@ -1327,7 +1382,7 @@ def verify_docx(path, expect):
         order_ok = texts.index(expect["summary"]) < texts.index("目录") < texts.index(expect["first_body"]) \
             if expect["first_body"] else True
     want_pb = ["目录"] + expect["h1_break"]
-    add("顺序 标题→摘要→目录→正文；目录、各一级板块、附录、修订说明另起一页", has_toc and order_ok and pb == want_pb,
+    add("顺序 标题→目录→正文；目录、各一级板块、附录另起一页", has_toc and order_ok and pb == want_pb,
         f"目录域{'有' if has_toc else '无'}；段前分页 {len(pb)} 处（应为 {len(want_pb)}）")
     tb_bad = []
     for ti, t in enumerate(d.tables, start=1):
@@ -1418,12 +1473,18 @@ def main(argv=None):
     print(f"表格列数与表头不一致：{'；'.join(r['bad_rows']) if r['bad_rows'] else '无'}")
     print(f"图下注明'数据与可编辑图表'或来源：{r['imgs'] - len(r['no_src'])}/{r['imgs']}"
           + (f"（未注明：{'、'.join(r['no_src'])}）" if r["no_src"] else ""))
+    print(f"图下来源行（只检查不改写）：带研报编号或页码 {len(r['src_ids'])} 处"
+          + "".join(f"\n  - {x}" for x in r["src_ids"]))
     n1, n2, n3 = r["ncount"]
     print(f"标题编号（只检查不改写）：正文一级 {n1}、二级 {n2}、三级 {n3}；问题 {len(r['num_issues'])} 处")
     for x in r["num_issues"]:
         print(f"  - {x}")
     print(f"表头单位：问题 {len(r['unit_issues'])} 处" + "".join(f"\n  - {x}" for x in r["unit_issues"]))
-    print(f"卷首与文末（只检查不改写）：问题 {len(r['fb_issues'])} 处" + "".join(f"\n  - {x}" for x in r["fb_issues"]))
+    print(f"报告外壳（只检查不改写）：问题 {len(r['shell_issues'])} 处"
+          + "".join(f"\n  - {x}" for x in r["shell_issues"]))
+    n_cite, cite_at = r["cite"]
+    print(f"出处标注与过程用语（只检查不改写）：{n_cite} 处"
+          + "".join(f"\n  - 「{w}」{len(v)} 处：{'、'.join(v)}" for w, v in cite_at))
     print(f"图号与文件名（只检查不改写）：图片 {r['imgs']} 张；问题 {len(r['fig_issues'])} 处"
           + "".join(f"\n  - {x}" for x in r["fig_issues"]))
     if r["missing"]:

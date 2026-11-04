@@ -6,8 +6,9 @@
 #   4) LibreOffice 重算（未安装时明确报告为"跳过"）
 #   5) 历史数据 Excel 脚本：用虚构公司 ACME 的最小长表生成工作簿并跑 --check（含格式规范 Part B 第 9–12 项）；
 #      --png 导出图表快照
-#   6) md2docx.py：示例 .md（摘要、目录、编号问题、单位表头、合计行、现场生成的占位 PNG、注释、附录）转 .docx，
-#      检查输出（含标题编号、卷首与文末、图号与文件名、格式规范 Part A 格式检查）并读回核对
+#   6) md2docx.py：合规示例 .md（报告外壳、目录、单位表头、合计行、现场生成的占位 PNG、注释、附：口径与说明）转 .docx，
+#      检查输出（含标题编号、报告外壳、出处标注、图下来源行、图号与文件名、格式规范 Part A 格式检查）并读回核对；
+#      不合规样例（一页摘要、正文带 [R23475 p5]、来源行带编号、取舍 / 来源 / 修订说明在正文）逐项报出
 #   7) check_delivery.py：用 rclone lsjson 样例 JSON（tests/fixtures/check_delivery_*.json）离线核对 Drive 布局、
 #      命名、格式，并核对本地 成品/、留痕/复用、复核；不联网
 # 用法：bash tests/run_tests.sh   （在仓库根目录运行）
@@ -201,15 +202,29 @@ cp tests/fixtures/md2docx_sample.md "$TMP/md/"
 python3 -c "from PIL import Image; Image.new('RGB', (1600, 800), (78, 121, 167)).save('$TMP/md/fig/fig1_营收与增速.png', dpi=(200, 200))"
 python3 research-sop/scripts/md2docx.py "$TMP/md/md2docx_sample.md" --out "$TMP/md/out.docx" --date 2026-11-04 \
   | tee "$TMP/md.txt"
-grep -q "标题 9（报告标题 1 / 一级 5 / 二级 2 / 三级 1）；表格 2；图片 1" "$TMP/md.txt"
-grep -q "页眉：ACME 公司档案（测试样例） ⇥ ACME · 2026-11-04" "$TMP/md.txt"
-grep -q "标题编号（只检查不改写）：正文一级 2、二级 2、三级 1；问题 2 处" "$TMP/md.txt"
-grep -q "「1.2 同行比较」：编号与标题之间缺全角空格" "$TMP/md.txt"
-grep -q "「三、未来：利好与利空」：跳号或错号，应为「二、」" "$TMP/md.txt"
-grep -q "格式检查（格式规范 Part A，读回 .docx 逐项比）：10/10 通过" "$TMP/md.txt"
-grep -q "卷首与文末（只检查不改写）：问题 1 处" "$TMP/md.txt"
-grep -q "文末没有以'口径与说明'为题的一节" "$TMP/md.txt"
-grep -q "图号与文件名（只检查不改写）：图片 1 张；问题 0 处" "$TMP/md.txt"
+for s in "标题 10（报告标题 1 / 一级 4 / 二级 4 / 三级 1）；表格 2；图片 1" "页眉：ACME 公司档案（测试样例） ⇥ ACME · 2026-11-04" \
+    "标题编号（只检查不改写）：正文一级 3、二级 4、三级 1；问题 0 处" "格式检查（格式规范 Part A，读回 .docx 逐项比）：10/10 通过" \
+    "图下来源行（只检查不改写）：带研报编号或页码 0 处" "报告外壳（只检查不改写）：问题 0 处" \
+    "出处标注与过程用语（只检查不改写）：0 处" "图号与文件名（只检查不改写）：图片 1 张；问题 0 处"; do
+  grep -qF -- "$s" "$TMP/md.txt" || { echo "合规样例缺少预期输出：$s"; exit 1; }
+done
+python3 - "$TMP/md" <<'EOF'
+import sys
+d = sys.argv[1]
+s = open(d + "/md2docx_sample.md", encoding="utf8").read()
+num = s.replace("### 2.2　同行比较", "### 2.2 同行比较").replace("## 三、未来", "## 四、未来")
+open(d + "/num_bad.md", "w", encoding="utf8").write(num)
+i, j = s.index("### 1.2　概述"), s.index("## 二、财务全史")
+open(d + "/no_overview.md", "w", encoding="utf8").write(s[:i] + s[j:])
+EOF
+python3 research-sop/scripts/md2docx.py "$TMP/md/num_bad.md" --check-only --img-root "$TMP/md" > "$TMP/num_bad.txt"
+grep -q "标题编号（只检查不改写）：正文一级 3、二级 4、三级 1；问题 2 处" "$TMP/num_bad.txt"
+grep -q "「2.2 同行比较」：编号与标题之间缺全角空格" "$TMP/num_bad.txt"
+grep -q "「四、未来：利好与利空」：跳号或错号，应为「三、」" "$TMP/num_bad.txt"
+python3 research-sop/scripts/md2docx.py "$TMP/md/no_overview.md" --check-only --img-root "$TMP/md" > "$TMP/no_ov.txt"
+grep -q "报告外壳（只检查不改写）：问题 1 处" "$TMP/no_ov.txt"
+grep -qF "'一、结论与概述'下缺'概述'" "$TMP/no_ov.txt"
+echo "合规样例：外壳、出处标注、图下来源行、编号、图号均 0 处；编号问题副本报 2 处；缺'概述'报出"
 python3 - "$TMP/md" <<'EOF'
 import sys
 from PIL import Image
@@ -218,7 +233,8 @@ for n in (1, 2, 3):
     Image.new("RGB", (800, 400), (78, 121, 167)).save(f"{d}/fig/fig{n}_样例.png")
 def doc(imgs, ref=""):
     body = "".join(f"![图 {a}　结论 {a}](fig/fig{f}_样例.png)\n\n数据与可编辑图表：样例 图表总览第 {f} 图\n\n" for a, f in imgs)
-    return f"# 图号样例\n\n## 一页摘要\n\n摘要。{ref}\n\n## 一、正文\n\n{body}## 附一、口径与说明\n\n说明。\n"
+    return (f"# 图号样例\n\n## 一、结论与概述\n\n### 1.1　结论\n\n结论。{ref}\n\n### 1.2　概述\n\n概述。\n\n"
+            f"## 二、正文\n\n{body}## 附：口径与说明\n\n说明。\n")
 open(d + "/fig_order_bad.md", "w", encoding="utf8").write(doc([(2, 2), (1, 1), (3, 3)]))
 open(d + "/fig_order_good.md", "w", encoding="utf8").write(doc([(1, 1), (2, 2), (3, 3)], "见图 3。"))
 open(d + "/fig_file_bad.md", "w", encoding="utf8").write(doc([(1, 1), (2, 1)], "见图 4。"))
@@ -233,32 +249,22 @@ python3 research-sop/scripts/md2docx.py "$TMP/md/fig_file_bad.md" --check-only -
 grep -q "图注'图 2'与文件名 fig1（fig1_样例.png）不一致" "$TMP/fig_file.txt"
 grep -q "正文引用了'图 4'，但全文只有 2 张图" "$TMP/fig_file.txt"
 echo "图号与文件名：顺序 2,1,3 报错、1,2,3 通过、图 2 配 fig1 报错、引用超出图总数报错"
-python3 - "$TMP/md" <<'EOF'
-import sys
-d = sys.argv[1]
-s = open(d + "/md2docx_sample.md", encoding="utf8").read()
-rev = "## 修订说明\n\n| 位置 | 原版 | 修订 | 结论是否改变 |\n|---|---|---|---|\n| 一 | 旧 | 新 | 否 |\n"
-meta = "2026-11-04 · 测试 · 版本 V2.0 · 数据截至 2026-09-30\n\n口径：亿美元。本报告不构成投资建议。\n\n"
-end = "## 附三、口径与说明\n\n" + meta
-title = "# ACME 公司档案（测试样例）\n"
-open(d + "/front_bad.md", "w", encoding="utf8").write(s.replace(title, title + "\n" + meta + rev, 1))
-open(d + "/front_good.md", "w", encoding="utf8").write(s.rstrip("\n") + "\n\n" + end + rev)
-open(d + "/rev_wrong.md", "w", encoding="utf8").write(s.rstrip("\n") + "\n\n" + rev + "\n" + end)
-EOF
-python3 research-sop/scripts/md2docx.py "$TMP/md/front_bad.md" --check-only --img-root "$TMP/md" > "$TMP/fb_bad.txt"
-grep -q "卷首与文末（只检查不改写）：问题 3 处" "$TMP/fb_bad.txt"
-grep -q "卷首含元信息，应移至文末'附：口径与说明'（标题与一页摘要之间 3 段" "$TMP/fb_bad.txt"
-grep -q "'修订说明'在一页摘要之前，应移至文末、排在'附：口径与说明'之后" "$TMP/fb_bad.txt"
-python3 research-sop/scripts/md2docx.py "$TMP/md/rev_wrong.md" --check-only --img-root "$TMP/md" > "$TMP/fb_wrong.txt"
-grep -q "'修订说明'应排在'附：口径与说明'之后、作为最后一节" "$TMP/fb_wrong.txt"
-python3 research-sop/scripts/md2docx.py "$TMP/md/front_good.md" --out "$TMP/md/front_good.docx" --date 2026-11-04 > "$TMP/fb_good.txt"
-grep -q "卷首与文末（只检查不改写）：问题 0 处" "$TMP/fb_good.txt"
-grep -q "格式检查（格式规范 Part A，读回 .docx 逐项比）：10/10 通过" "$TMP/fb_good.txt"
-for t in theme industry company; do
-  python3 research-sop/scripts/md2docx.py research-sop/templates/${t}_report.md --check-only --img-root "$TMP/nowhere" 2>/dev/null \
-    | grep -q "卷首与文末（只检查不改写）：问题 0 处" || { echo "模板 ${t}_report.md 卷首与文末应为 0 处问题"; exit 1; }
+cp tests/fixtures/md2docx_bad.md "$TMP/md/"
+python3 research-sop/scripts/md2docx.py "$TMP/md/md2docx_bad.md" --check-only --img-root "$TMP/md" > "$TMP/bad.txt"
+for s in "报告外壳（只检查不改写）：问题 7 处" \
+    "标题与第一章之间有 1 段（首段「2026-11-04 · 测试 · 版本 V2.0 · 数据」），标题后应直接进'一、结论与概述'；元信息放'附：口径与说明'" \
+    "标题后第一个一级标题应为'一、结论与概述'，现为'一页摘要'" "'一页摘要'作为节标题出现：不设一页摘要，改写为'一、结论与概述'" \
+    "'附一、本报告的取舍'作为节标题出现在正文：取舍进底稿" "'附二、来源'作为节标题出现在正文：来源清单进底稿" \
+    "'修订说明'作为节标题出现在正文：修订说明进底稿 复核/修订说明_Vx.md" "最后一节应为'附：口径与说明'，现为'修订说明'" \
+    "出处标注与过程用语（只检查不改写）：3 处" "「一页摘要」1 处：[R23475 p5]" "「一、财务全史」2 处：台账、对账" \
+    "图下来源行（只检查不改写）：带研报编号或页码 1 处" "fig1_营收与增速.png 的来源行带研报编号或页码：「来源：WSTS，R23475 p5。」"; do
+  grep -qF -- "$s" "$TMP/bad.txt" || { echo "不合规样例缺少预期输出：$s"; exit 1; }
 done
-echo "卷首与文末：元信息与修订说明在卷首、修订说明排在口径与说明之前都报出；合规写法 0 处、格式检查 10/10；三份模板 0 处"
+python3 research-sop/scripts/md2docx.py research-sop/templates/report_shell.md --check-only --img-root "$TMP/nowhere" > "$TMP/shell.txt"
+for s in "报告外壳（只检查不改写）：问题 0 处" "出处标注与过程用语（只检查不改写）：0 处" "标题编号（只检查不改写）：正文一级 1、二级 2、三级 0；问题 0 处"; do
+  grep -qF -- "$s" "$TMP/shell.txt" || { echo "外壳模板 report_shell.md 缺少预期输出：$s"; exit 1; }
+done
+echo "报告外壳与出处标注：不合规样例报出卷首元信息、一页摘要、取舍 / 来源 / 修订说明在正文、末节不是口径与说明、[R23475 p5] 与过程用语、来源行带编号；外壳模板 0 处"
 if python3 research-sop/scripts/md2docx.py "$TMP/md/md2docx_sample.md" --check-only --img-root "$TMP/nowhere" \
     >/dev/null 2>"$TMP/md_err.txt"; then
   echo "缺图时应以非零码退出"; exit 1
@@ -273,10 +279,12 @@ d = docx.Document(sys.argv[1])
 assert os.path.getsize(sys.argv[1]) < 30 * 1024, "瘦身后应在 30 KB 以内（MCP 上传按 base64 走）"
 st = lambda name: [p for p in d.paragraphs if p.style.name == name]
 assert [p.text for p in st("Title")] == ["ACME 公司档案（测试样例）"]
-assert [p.text for p in st("独立标题")] == ["一页摘要", "目录"]
-assert len(st("Heading 1")) == 4 and len(st("Heading 2")) == 2 and len(st("Heading 3")) == 1
+assert [p.text for p in st("独立标题")] == ["目录"]
+assert len(st("Heading 1")) == 4 and len(st("Heading 2")) == 4 and len(st("Heading 3")) == 1
 assert [p.text for p in d.paragraphs if p.paragraph_format.page_break_before] == \
-    ["目录", "一、财务全史", "三、未来：利好与利空", "附一、本报告的取舍", "附二、来源"]
+    ["目录", "一、结论与概述", "二、财务全史", "三、未来：利好与利空", "附：口径与说明"]
+texts = [p.text for p in d.paragraphs]
+assert texts.index("ACME 公司档案（测试样例）") < texts.index("目录") < texts.index("一、结论与概述"), "标题→目录→第一章"
 sec = d.sections[0]
 assert (sec.page_width.twips, sec.page_height.twips) == (11906, 16838) and sec.left_margin.twips == 1134
 assert "ACME · 2026-11-04" in sec.header.paragraphs[0].text and "NUMPAGES" in sec.footer._element.xml
@@ -304,8 +312,8 @@ assert {p.text.split("：")[0] for p in notes} >= {"表注", "数据与可编辑
 assert d.styles["注释小字"].font.size.pt == 9 and str(d.styles["注释小字"].font.color.rgb) == "666666"
 assert [p.text for p in st("表题")] == ["表 1 全史总表：营收与毛利率"]
 body = "\n".join(p.text for p in d.paragraphs)
-assert "[R01234 p5]" in body and "**" not in body
-print("md2docx：A4 页面、页眉页脚、摘要→目录→正文分页、标题层级与字号、单位表头、合计行、列宽、注释、表题、缺图报错均正确")
+assert "**" not in body and "[R" not in body
+print("md2docx：A4 页面、页眉页脚、标题→目录→一、结论与概述→各章→附：口径与说明分页、标题层级与字号、单位表头、合计行、列宽、注释、表题、缺图报错均正确")
 EOF
 
 echo "== 7. check_delivery.py（离线，lsjson 样例） =="
