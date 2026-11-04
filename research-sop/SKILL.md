@@ -11,7 +11,7 @@ description: Research SOP（主题·行业·公司）：研究某个主题、某
 
 适用：研究某个主题、某个行业或某家公司；行业横向比较；周期或趋势研究；完整研报；修订已交付的报告。只要主题或行业时只写对应层，见 D0 第 3 步。
 
-版本：0.13.0（版本记录见仓库根目录 `CHANGELOG.md`）。本版要点：`md2docx.py`、`build_history_xlsx.py` 按格式规范输出 .docx / .xlsx，转换为 Google 文档 / 表格后按 `standards/转换后修补清单.md` 原地修补。0.12.0 要点仍有效：存储规范与格式规范并入（`standards/`），存储与格式以规范为准，单位一律用万、亿。0.11.1 要点仍有效：彻底解耦——本文件只管方法，不提 Drive 里任何具体文件；用 Google Drive 时按 Drive 里的规则做。0.10.0 要点仍有效：由 company-dossier 更名；主题、行业研究可单独触发。0.9.0 要点仍有效：① 交付一律 Google 格式——提交到 Drive 的文档一律是 Google 文档、表格一律是 Google 表格，本地 md、docx、xlsx、csv 只是中间件，上传时转换，不上传原文件；② 公司报告第五节开头加"股价行为画像"，股价事件门槛从绝对涨跌幅改为按 σ 的超额收益；③ 新增"图表可读性"，作为所有图表的验收。0.8.x 要点仍有效：报告只写一遍（只写 `.md`，由脚本转换）、图表由脚本导出、先台账再正文、检查只重读核心数字。
+版本：0.13.1（版本记录见仓库根目录 `CHANGELOG.md`）。本版要点：`md2docx.py`、`build_history_xlsx.py` 按格式规范输出 .docx / .xlsx，转换为 Google 文档 / 表格后按 `standards/转换后修补清单.md` 原地修补。0.12.0 要点仍有效：存储规范与格式规范并入（`standards/`），存储与格式以规范为准，单位一律用万、亿。0.11.1 要点仍有效：彻底解耦——本文件只管方法，不提 Drive 里任何具体文件；用 Google Drive 时按 Drive 里的规则做。0.10.0 要点仍有效：由 company-dossier 更名；主题、行业研究可单独触发。0.9.0 要点仍有效：① 交付一律 Google 格式——提交到 Drive 的文档一律是 Google 文档、表格一律是 Google 表格，本地 md、docx、xlsx、csv 只是中间件，上传时转换，不上传原文件；② 公司报告第五节开头加"股价行为画像"，股价事件门槛从绝对涨跌幅改为按 σ 的超额收益；③ 新增"图表可读性"，作为所有图表的验收。0.8.x 要点仍有效：报告只写一遍（只写 `.md`，由脚本转换）、图表由脚本导出、先台账再正文、检查只重读核心数字。
 
 本文件与具体 AI 平台无关。能读文件、运行代码的智能体照此执行；只能对话的 AI 用同目录的 `PROMPT.md`。
 模板在 `templates/`；本技能的脚本在 `scripts/`（`build_history_xlsx.py` 生成历史数据 Excel 与图表快照，`md2docx.py` 把报告 .md 转成 .docx）；研报库检索脚本复用上级目录的 `../scripts/`（`library_search.py`、`prepare_reading.py`、`pdf_text.py`）；出处规则与 `../SKILL.md`（sellside-valuation-audit）一致。
