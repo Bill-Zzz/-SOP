@@ -7,7 +7,7 @@
   加 --png <目录>：把"图表总览"的每张图用同一份数据区（"图表计算"）画成 PNG 快照，文件名 图01_营收与增速.png、
   图02_分部结构.png……编号与图表总览顺序一致；第二层没填、数据为空的图跳过并打印"跳过：图 X 无数据"。
   依赖 matplotlib（缺时跳过并提示，不报错）；中文字体用 Noto Sans CJK / Noto Sans SC / WenQuanYi，找不到退回 DejaVu 并警告。
-  同时加 --check 时多一项"9 PNG 快照数量 = 有数据的图数量"。每家公司用单独的 PNG 目录（文件名不含代码）。
+  同时加 --check 时多一项"13 PNG 快照数量 = 有数据的图数量"。每家公司用单独的 PNG 目录（文件名不含代码）。
 
 输入（<根目录>/<代码>/ 下）：
   <代码>_富途三表_长表.csv（优先；没有则用 <代码>_富途财报_长表.csv）
@@ -33,14 +33,22 @@ from xml.etree import ElementTree as ET
 
 try:
     import openpyxl
-    from openpyxl.chart import BarChart, LineChart, Reference, ScatterChart, Series
+    from openpyxl.chart import BarChart, LineChart, Reference
+    from openpyxl.chart.axis import ChartLines
+    from openpyxl.chart.layout import Layout, ManualLayout
     from openpyxl.chart.shapes import GraphicalProperties
-    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.chart.text import RichText, Text
+    from openpyxl.chart.title import Title
+    from openpyxl.drawing.line import LineProperties
+    from openpyxl.drawing.text import CharacterProperties, Font as DFont, Paragraph, ParagraphProperties, \
+        RegularTextRun
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter, column_index_from_string
+    from openpyxl.utils.indexed_list import IndexedList
 except ImportError:  # pragma: no cover
     sys.exit("缺少 openpyxl：python3 -m pip install --user openpyxl")
 
-SCRIPT_VERSION = "0.8.0"
+SCRIPT_VERSION = "0.9.0"
 CUR_NAME = {"USD": "美元", "TWD": "新台币", "EUR": "欧元", "HKD": "港元", "CNY": "人民币",
             "JPY": "日元", "GBP": "英镑", "KRW": "韩元"}
 STMTS = ["利润表", "资产负债表", "现金流量表"]
@@ -102,14 +110,35 @@ MAP_NAME = {"营收": "rev", "营业成本": "cogs", "毛利": "gp", "研发费�
             "现金及等价物": "cash", "应收账款": "ar", "存货": "inv", "商誉": "gw", "总资产": "ta",
             "总负债": "tl", "股东权益": "eq", "短期债务": "std", "长期债务": "ltd"}
 
-HDR_FILL = PatternFill("solid", fgColor="DCE6F1")
-SEC_FILL = PatternFill("solid", fgColor="F2F2F2")
-L2_FILL = PatternFill("solid", fgColor="FFF2CC")
+# ---- 格式（standards/格式规范.md Part B）
+LATIN_FONT, CJK_FONT, FONT_PT = "Arial", "Noto Sans SC", 10
+C_TITLE, C_SEC_BG, C_SEC_FG, C_HDR, C_BAND, C_NOTE = "17365D", "D9EAF7", "17365D", "1F4E78", "F7F9FB", "808080"
+C_INPUT, C_FORMULA, C_LINK, C_EXT, C_WHITE = "0000FF", "000000", "008000", "FF0000", "FFFFFF"
+TAB_COLOR = "17365D"
+PX_A, PX_COL, PX_LONG = 260, 100, 120          # 列宽（像素）
+PX_ROW, PX_TITLE, PX_HEAD, PX_LINE = 20, 28, 22, 20  # 行高（像素）；PX_LINE = 换行后每行
+MAX_WRAP_LINES = 8                             # 长文本超过 8 行不换行（整段在单元格里，向右溢出）
+# 图表色板：主要、次要、对照（另有正向 #70AD47、负向 #C00000、预测 #ED7D31，历史数据表用不到）
+CHART_COLORS = ["17365D", "5B9BD5", "A6A6A6"]
+GRID_COLOR = "D9D9D9"
+# 数字格式：负数括号、零值短横线
+F_AMT = '#,##0.0;(#,##0.0);"-"'
+F_PCT = '0.0%;(0.0%);"-"'
+F_X = '0.0"x";(0.0"x");"-"'
+F_SH = '#,##0.0;(#,##0.0);"-"'      # 股数：亿股
+F_PX = '$#,##0.00;($#,##0.00);"-"'  # 股价：美元
+F_EPS = '#,##0.00;(#,##0.00);"-"'   # 每股收益、每股营收等每股金额
+F_RATIO = '0.000;(0.000);"-"'       # 股数年变化（倍）
+F_DAYS = '#,##0.0;(#,##0.0);"-"'    # 天数、富途关键指标原值
+F_DATE = "yyyy-mm-dd"
+F_YEAR = '0"A"'                     # 年度期间标签：数值 2024 显示 2024A（公式与年份筛选仍按数值匹配）
+F_INT = "0"                         # 图表总览起止年份（输入）
+ALLOWED_FMTS = {F_AMT, F_PCT, F_X, F_SH, F_PX, F_EPS, F_RATIO, F_DAYS, F_DATE, F_YEAR, F_INT}
 BOLD = Font(bold=True)
-TITLE = Font(bold=True, size=14)
-NOTE = Font(italic=True, color="666666", size=9)
+TITLE = Font(bold=True, size=FONT_PT)
+NOTE = Font(color=C_NOTE, size=FONT_PT)
 WRAP = Alignment(wrap_text=True, vertical="top")
-F_AMT, F_PCT, F_X, F_SH, F_DATE, F_PX = "#,##0.00", "0.0%", "0.00\"x\"", "#,##0.0", "yyyy-mm-dd", "#,##0.00"
+CJK_RE = re.compile(r"[⺀-鿿＀-￯　-〿]")
 
 
 # ---------------------------------------------------------------- 读数据
@@ -203,8 +232,9 @@ class Export:
             return list(csv.DictReader(f))
 
     def label(self, per):
+        """期间标签（格式规范第 11 节）：年度 2024A，季度 2Q25A（FY2025 第 2 季度）；历史数据全部是实际数 A。"""
         m = self.meta[per]
-        return f"FY{m['fy']}" if m["type"] == "7" else f"FY{m['fy']}Q{m['type']}"
+        return f"{m['fy']}A" if m["type"] == "7" else f"{m['type']}Q{m['fy'] % 100:02d}A"
 
     def cands(self, key):
         c = list(CORE_BY_KEY[key][3])
@@ -225,7 +255,7 @@ class Export:
         return None, None, None
 
     def shares(self, per, kind="b"):
-        """加权股数（百万股）= 归属普通股净利润 ÷ 每股收益；返回 (值, 相对舍入误差)。"""
+        """加权股数（亿股）= 归属普通股净利润 ÷ 每股收益；返回 (值, 相对舍入误差)。"""
         nic = self.core("nic", per)[0]
         eps, _, eraw = self.core("eps_" + kind, per)
         if nic is None or eps in (None, 0) or nic == 0:
@@ -233,17 +263,17 @@ class Export:
         d = decimals_of(eraw)
         # 导出会丢掉末尾的 0（3.30 → 3.3），按至少 2 位小数估计
         err = (0.5 * 10 ** (-max(d, 2))) / abs(eps) if d is not None else None
-        return nic / eps / 1e6, err
+        return nic / eps / 1e8, err
 
     def end_shares(self, per):
-        """期末股数（百万股）；返回 (值, 科目名, 未采用的原因)。量级与基本加权股数不符（0.5–2 倍以外）的不采用。"""
+        """期末股数（亿股）；返回 (值, 科目名, 未采用的原因)。量级与基本加权股数不符（0.5–2 倍以外）的不采用。"""
         for st in END_SHARE_STMTS:
             d = self.data.get((st, per), {})
             for nm in END_SHARE_ITEMS:
                 v = d.get(nm)
                 if v is None or v <= 0:
                     continue
-                v /= 1e6
+                v /= 1e8
                 wb = self.shares(per, "b")[0]
                 if not wb or wb <= 0:
                     return None, nm, f"{st}·{nm} 有数，但当年没有加权股数可比对量级，未采用"
@@ -345,20 +375,38 @@ def find_events(px, one_day=0.08, win=21, win_th=0.20):
 
 
 # ---------------------------------------------------------------- 写工作簿
-def hdr(ws, row, values, col=1, fill=HDR_FILL):
+def roles(ws):
+    """每张表的格式角色：主标题行、列标题单元格、分区标题单元格、辅助说明单元格。format_sheet 按角色上格式。"""
+    r = ws.__dict__.get("_sop_roles")
+    if r is None:
+        r = {"title": set(), "header": set(), "section": set(), "note": set()}
+        ws.__dict__["_sop_roles"] = r
+    return r
+
+
+def hdr(ws, row, values, col=1):
     for i, v in enumerate(values):
         c = ws.cell(row=row, column=col + i, value=v)
-        c.font = BOLD
-        c.fill = fill
-        c.alignment = Alignment(wrap_text=True, vertical="center")
+        roles(ws)["header"].add(c.coordinate)
 
 
-def title(ws, text, note=None):
+def section(ws, coord, text=None):
+    if text is not None:
+        ws[coord] = text
+    roles(ws)["section"].add(coord)
+
+
+def mark_note(ws, coord, text=None):
+    if text is not None:
+        ws[coord] = text
+    roles(ws)["note"].add(coord)
+
+
+def title(ws, text, note_text=None):
     ws["A1"] = text
-    ws["A1"].font = TITLE
-    if note:
-        ws["A2"] = note
-        ws["A2"].font = NOTE
+    roles(ws)["title"].add(1)
+    if note_text:
+        mark_note(ws, "A2", note_text)
 
 
 def guard(expr, refs):
@@ -380,6 +428,7 @@ class Builder:
         self.U = f"亿{CUR_NAME.get(self.cur, self.cur)}"
         self.today = dt.date.today()
         self.wb = openpyxl.Workbook()
+        set_default_font(self.wb)
         self.wb.remove(self.wb.active)
         names = ["图表总览", "说明", "历年营收与业务拆分", "年度三表", "年度衍生指标", "近12季度明细",
                  "市值与营收对比", "市值与估值", "股价事件", "IPO指标", "所得税与现金税", "重大融资时间线",
@@ -399,11 +448,11 @@ class Builder:
         self.ycol = {y: get_column_letter(5 + i) for i, y in enumerate(self.years)}
         self.src_col = get_column_letter(5 + len(self.years))
         hdr(ws, 4, ["区块", "原始科目名", "标准化中文名", "单位"] + self.years + ["来源ID"])
-        ws.freeze_panes = "E5"
+        for y in self.years:
+            ws[f"{self.ycol[y]}4"].number_format = F_YEAR
         r = 5
         self.trow = {}
-        ws.cell(row=r, column=1, value="核心科目（标准化，按候选科目逐年取第一个有数的）").font = BOLD
-        ws.cell(row=r, column=1).fill = SEC_FILL
+        section(ws, f"A{r}", "核心科目（标准化，按候选科目逐年取第一个有数的）")
         r += 1
         for key, name, st, _, kind in CORE:
             used = OrderedDict()
@@ -414,7 +463,7 @@ class Builder:
                 used.setdefault(nm, []).append(y)
                 c = ws[f"{self.ycol[y]}{r}"]
                 c.value = v / 1e8 if kind == "amt" else v
-                c.number_format = F_AMT if kind == "amt" else "0.0000"
+                c.number_format = F_AMT if kind == "amt" else F_EPS
             src = "；".join(f"{st}·{nm}（{ys[0]}–{ys[-1]}）" if len(used) > 1 else f"{st}·{nm}"
                            for nm, ys in used.items()) or "富途无此科目"
             ws.cell(row=r, column=1, value="核心")
@@ -426,13 +475,13 @@ class Builder:
             r += 1
         for key, name, kind in [("sh_b", "基本加权股数", "b"), ("sh_d", "稀释加权股数", "d")]:
             ws.cell(row=r, column=1, value="核心（推算）")
-            ws.cell(row=r, column=2, value=f"归属普通股股东净利润 × 100 ÷ {'基本' if kind == 'b' else '稀释'}每股收益")
+            ws.cell(row=r, column=2, value=f"归属普通股股东净利润 ÷ {'基本' if kind == 'b' else '稀释'}每股收益")
             ws.cell(row=r, column=3, value=name)
-            ws.cell(row=r, column=4, value="百万股")
+            ws.cell(row=r, column=4, value="亿股")
             for y in self.years:
                 n = f"{self.ycol[y]}{self.trow['nic']}"
                 e = f"{self.ycol[y]}{self.trow['eps_' + kind]}"
-                ws[f"{self.ycol[y]}{r}"] = guard(f'IF(OR({e}=0,{n}=0),"",{n}*100/{e})', [n, e])
+                ws[f"{self.ycol[y]}{r}"] = guard(f'IF(OR({e}=0,{n}=0),"",{n}/{e})', [n, e])
                 ws[f"{self.ycol[y]}{r}"].number_format = F_SH
             ws[f"{self.src_col}{r}"] = "F1"
             self.trow[key] = r
@@ -447,8 +496,7 @@ class Builder:
             items = ex.order.get(st, [])
             if not items:
                 continue
-            ws.cell(row=r, column=1, value=f"{st}（富途全部科目）" if st != "关键指标" else "富途关键指标（原值）").font = BOLD
-            ws.cell(row=r, column=1).fill = SEC_FILL
+            section(ws, f"A{r}", f"{st}（富途全部科目）" if st != "关键指标" else "富途关键指标（原值）")
             r += 1
             for it in items:
                 ws.cell(row=r, column=1, value=st)
@@ -463,15 +511,10 @@ class Builder:
                         continue
                     c = ws[f"{self.ycol[y]}{r}"]
                     c.value = v if (st == "关键指标" or is_eps) else v / 1e8
-                    c.number_format = "0.0000" if is_eps else F_AMT
+                    c.number_format = F_EPS if is_eps else (F_DAYS if st == "关键指标" else F_AMT)
                 ws[f"{self.src_col}{r}"] = "F1"
                 r += 1
             r += 1
-        ws.column_dimensions["A"].width = 12
-        ws.column_dimensions["B"].width = 34
-        ws.column_dimensions["C"].width = 22
-        for y in self.years:
-            ws.column_dimensions[self.ycol[y]].width = 11
 
     def T(self, key, y):
         return f"{q('年度三表')}{self.ycol[y]}{self.trow[key]}"
@@ -490,14 +533,13 @@ class Builder:
             ("毛利率", F_PCT), ("营业利润率", F_PCT), ("净利率", F_PCT), ("研发 / 收入", F_PCT),
             ("资本开支 / 收入", F_PCT), ("折旧 / 收入", F_PCT), (f"经营现金流（{self.U}）", F_AMT),
             (f"资本开支（{self.U}）", F_AMT), (f"FCF（{self.U}）", F_AMT), ("FCF / 净利润", F_PCT),
-            (f"净现金（{self.U}）", F_AMT), ("商誉 / 总资产", F_PCT), ("基本加权股数（百万股）", F_SH),
-            ("股数年变化（倍）", "0.000"), ("稀释加权股数（百万股）", F_SH), ("每股营收", "0.000"),
-            ("每股 FCF", "0.000"), ("有效税率", F_PCT), ("ROIC", F_PCT), ("ROE", F_PCT),
-            (f"EBITDA（{self.U}）", F_AMT), ("OCF / 净利润", F_PCT), ("应收天数", "0.0"), ("存货天数", "0.0"),
-            ("应付天数", "0.0"), ("GAAP − 非GAAP 差额（第二层）", F_AMT), ("备注", None), ("来源ID", None)]
+            (f"净现金（{self.U}）", F_AMT), ("商誉 / 总资产", F_PCT), ("基本加权股数（亿股）", F_SH),
+            ("股数年变化（倍）", F_RATIO), ("稀释加权股数（亿股）", F_SH), ("每股营收", F_EPS),
+            ("每股 FCF", F_EPS), ("有效税率", F_PCT), ("ROIC", F_PCT), ("ROE", F_PCT),
+            (f"EBITDA（{self.U}）", F_AMT), ("OCF / 净利润", F_PCT), ("应收天数", F_DAYS), ("存货天数", F_DAYS),
+            ("应付天数", F_DAYS), ("GAAP − 非GAAP 差额（第二层）", F_AMT), ("备注", None), ("来源ID", None)]
         hdr(ws, 4, [c[0] for c in cols])
         self.dcol = {c[0]: get_column_letter(i + 1) for i, c in enumerate(cols)}
-        ws.freeze_panes = "C5"
         self.drow = {}
         T = self.T
         for i, y in enumerate(self.years):
@@ -505,6 +547,7 @@ class Builder:
             self.drow[y] = r
             p = self.years[i - 1] if i > 0 and self.years[i - 1] == y - 1 else None
             ws[f"A{r}"] = y
+            ws[f"A{r}"].number_format = F_YEAR
             ws[f"B{r}"] = dt.date.fromisoformat(ex.meta[ex.aper[y]]["end"])
             ws[f"B{r}"].number_format = F_DATE
             D = self.dcol
@@ -525,11 +568,11 @@ class Builder:
             fcf = cell(f"FCF（{self.U}）")
             f["FCF / 净利润"] = guard(f'IF({T("ni", y)}<=0,"",{fcf}/{T("ni", y)})', [fcf, T("ni", y)])
             f[f"净现金（{self.U}）"] = guard(f"{T('cash_sti', y)}-N({T('std', y)})-N({T('ltd', y)})", [T("cash_sti", y)])
-            f["基本加权股数（百万股）"] = guard(T("sh_b", y), [T("sh_b", y)])
-            f["稀释加权股数（百万股）"] = guard(T("sh_d", y), [T("sh_d", y)])
-            sh = cell("稀释加权股数（百万股）")
-            f["每股营收"] = guard(f"{T('rev', y)}*100/{sh}", [T("rev", y), sh])
-            f["每股 FCF"] = guard(f"{fcf}*100/{sh}", [fcf, sh])
+            f["基本加权股数（亿股）"] = guard(T("sh_b", y), [T("sh_b", y)])
+            f["稀释加权股数（亿股）"] = guard(T("sh_d", y), [T("sh_d", y)])
+            sh = cell("稀释加权股数（亿股）")
+            f["每股营收"] = guard(f"{T('rev', y)}/{sh}", [T("rev", y), sh])
+            f["每股 FCF"] = guard(f"{fcf}/{sh}", [fcf, sh])
             f["有效税率"] = guard(f'IF({T("pti", y)}<=0,"",{T("tax", y)}/{T("pti", y)})', [T("tax", y), T("pti", y)])
             tr = f'IF(N({T("pti", y)})>0,MIN(MAX(N({T("tax", y)})/{T("pti", y)},0),0.35),0.21)'
             f["ROIC"] = guard(f"{T('op', y)}*(1-{tr})/({T('eq_t', y)}+N({T('std', y)})+N({T('ltd', y)}))",
@@ -555,9 +598,6 @@ class Builder:
                                  "日线为拆股调整价，富途每股收益也按拆股调整，需人工核对")
             ws[cell("备注")] = "；".join(notes) or None
             ws[cell("来源ID")] = "F1"
-        for name, _ in cols:
-            ws.column_dimensions[self.dcol[name]].width = 12
-        ws.column_dimensions[self.dcol["备注"]].width = 50
 
     def Dv(self, name, y):
         return f"{q('年度衍生指标')}{self.dcol[name]}{self.drow[y]}"
@@ -567,11 +607,10 @@ class Builder:
         ws, ex = self.ws["历年营收与业务拆分"], self.ex
         U = self.U
         title(ws, "历年营收与业务拆分")
-        ws["B2"] = (f"金额：{U}；占比 / 同比：%；空白 ≠ 0；新旧分类不可相加。合并营收由脚本从'年度三表'引用（层级 1）；"
+        mark_note(ws, "B2", f"金额：{U}；占比 / 同比：%；空白 ≠ 0；新旧分类不可相加。合并营收由脚本从'年度三表'引用（层级 1）；"
                     "分部列由第二层按公司原披露分类填写（分类变更时新旧分类并列、各自成组，把占位名改成真实分部名）；"
                     "未拆分收入 = 没有任何分部数时的合并营收；现代分类勾稽差额 = 合并营收 − Σ分部营收 − 未拆分收入"
                     "（新旧分类并列的年份，第二层填写时把旧分类组从勾稽公式中去掉）。")
-        ws["B2"].font = NOTE
         heads = ["期间", "期间口径", f"合并营收（{U}）", "合并同比（%）"]
         for k in range(1, nseg + 1):
             n = f"分部{k}（待填）"
@@ -579,10 +618,6 @@ class Builder:
         heads += [f"未拆分收入营收（{U}）", "未拆分收入占比（%）", "未拆分收入同比（%）", "来源ID",
                   f"现代分类勾稽差额（{U}）", "分类与同比说明"]
         hdr(ws, 3, heads)
-        for k in range(nseg):
-            for j in range(3):
-                ws.cell(row=3, column=5 + 3 * k + j).fill = L2_FILL
-        ws.freeze_panes = "C4"
         C = lambda i: get_column_letter(i)
         seg_cols = [C(5 + 3 * k) for k in range(nseg)]
         un = C(5 + 3 * nseg)
@@ -597,6 +632,7 @@ class Builder:
             r = 4 + i
             ws[f"A{r}"], ws[f"B{r}"] = y, kind
             if isinstance(y, int):
+                ws[f"A{r}"].number_format = F_YEAR
                 self.rev_row[y] = r
                 ws[f"C{r}"] = guard(self.T("rev", y), [self.T("rev", y)])
                 prev = self.rev_row.get(y - 1)
@@ -623,8 +659,6 @@ class Builder:
             for col in range(3, 10 + 3 * nseg):
                 h = heads[col - 1]
                 ws.cell(row=r, column=col).number_format = F_PCT if "%" in h else F_AMT
-        ws.column_dimensions["A"].width = 18
-        ws.column_dimensions[note].width = 50
         self.rev_last_row = 3 + len(rows)
 
     def ytd(self):
@@ -660,7 +694,6 @@ class Builder:
               f"每季一列，单季数（富途报告类型 1–4 均为单季）；金额 {U}；比率 %；环比、同比公式写在单元格；"
               "上年同期为富途同一财季的数（同比基数）；第一季没有上一季，环比留空；分部逐季由第二层填写。")
         hdr(ws, 3, ["指标", "单位"] + [ex.label(p) for p in qs] + ["来源ID"])
-        ws.freeze_panes = "C4"
         qc = {p: get_column_letter(3 + i) for i, p in enumerate(qs)}
         srcc = get_column_letter(3 + len(qs))
         self.qcol = qc
@@ -671,10 +704,9 @@ class Builder:
         self.qrow = {}
         r = 5
 
-        def section(text):
+        def sec_row(text):
             nonlocal r
-            ws.cell(row=r, column=1, value=text).font = BOLD
-            ws.cell(row=r, column=1).fill = SEC_FILL
+            section(ws, f"A{r}", text)
             r += 1
 
         def put_vals(key, name, getter, unit, fmt, tag=""):
@@ -707,21 +739,21 @@ class Builder:
 
         amt = lambda key, pp: (ex.core(key, pp)[0] / 1e8 if pp and ex.core(key, pp)[0] is not None else None)
         A = lambda key, p, i: f"{qc[p]}{self.qrow[key]}"
-        section("本季")
+        sec_row("本季")
         base = [("rev", "营收"), ("gp", "毛利"), ("op", "营业利润"), ("ni", "净利润（归母）"),
                 ("ocf", "经营现金流"), ("capex", "资本开支"), ("nic", "归属普通股股东净利润")]
         for key, name in base:
             put_vals(key, name, lambda p, k=key: amt(k, p), U, F_AMT)
-        put_vals("eps_d", "稀释每股收益", lambda p: ex.core("eps_d", p)[0], f"{CUR_NAME.get(self.cur, self.cur)}/股", "0.0000")
+        put_vals("eps_d", "稀释每股收益", lambda p: ex.core("eps_d", p)[0], f"{CUR_NAME.get(self.cur, self.cur)}/股", F_EPS)
         put_f("fcf", "FCF（经营现金流 + 资本开支）",
               lambda p, i: guard(f"{A('ocf', p, i)}+{A('capex', p, i)}", [A("ocf", p, i), A("capex", p, i)]), U, F_AMT)
         put_f("sh_d", "稀释加权股数（推算）",
-              lambda p, i: guard(f'IF({A("eps_d", p, i)}=0,"",{A("nic", p, i)}*100/{A("eps_d", p, i)})',
-                                 [A("nic", p, i), A("eps_d", p, i)]), "百万股", F_SH)
+              lambda p, i: guard(f'IF({A("eps_d", p, i)}=0,"",{A("nic", p, i)}/{A("eps_d", p, i)})',
+                                 [A("nic", p, i), A("eps_d", p, i)]), "亿股", F_SH)
         for key, name, a in [("gm", "毛利率", "gp"), ("opm", "营业利润率", "op"), ("npm", "净利率", "ni")]:
             put_f(key, name, lambda p, i, a=a: guard(f"{A(a, p, i)}/{A('rev', p, i)}", [A(a, p, i), A("rev", p, i)]),
                   "%", F_PCT)
-        section("环比（本季 ÷ 上一季 − 1）")
+        sec_row("环比（本季 ÷ 上一季 − 1）")
         for key, name in [("rev", "营收"), ("gp", "毛利"), ("op", "营业利润"), ("ni", "净利润（归母）"),
                           ("ocf", "经营现金流"), ("fcf", "FCF"), ("eps_d", "稀释每股收益")]:
             def fn(p, i, key=key):
@@ -730,31 +762,27 @@ class Builder:
                 a, b = A(key, p, i), f"{qc[qs[i - 1]]}{self.qrow[key]}"
                 return guard(f'IF({b}<=0,"",{a}/{b}-1)', [a, b])
             put_f("qoq_" + key, f"{name}环比", fn, "%", F_PCT)
-        section("上年同期（同比基数）")
+        sec_row("上年同期（同比基数）")
         for key, name in base:
             put_vals(key, name + "（上年同期）", lambda p, k=key: amt(k, prior_q(p)), U, F_AMT, tag="py_")
         put_vals("eps_d", "稀释每股收益（上年同期）",
                  lambda p: ex.core("eps_d", prior_q(p))[0] if prior_q(p) else None,
-                 f"{CUR_NAME.get(self.cur, self.cur)}/股", "0.0000", tag="py_")
+                 f"{CUR_NAME.get(self.cur, self.cur)}/股", F_EPS, tag="py_")
         put_f("py_fcf", "FCF（上年同期）",
               lambda p, i: guard(f"{A('py_ocf', p, i)}+{A('py_capex', p, i)}", [A("py_ocf", p, i), A("py_capex", p, i)]),
               U, F_AMT)
-        section("同比（本季 ÷ 上年同期 − 1）")
+        sec_row("同比（本季 ÷ 上年同期 − 1）")
         for key, name in [("rev", "营收"), ("gp", "毛利"), ("op", "营业利润"), ("ni", "净利润（归母）"),
                           ("ocf", "经营现金流"), ("fcf", "FCF"), ("eps_d", "稀释每股收益")]:
             put_f("yoy_" + key, f"{name}同比",
                   lambda p, i, key=key: guard(f'IF({A("py_" + key, p, i)}<=0,"",{A(key, p, i)}/{A("py_" + key, p, i)}-1)',
                                               [A(key, p, i), A("py_" + key, p, i)]), "%", F_PCT)
-        section("分部逐季（第二层填写；占比 = 分部营收 ÷ 营收）")
+        sec_row("分部逐季（第二层填写；占比 = 分部营收 ÷ 营收）")
         for k in range(1, 4):
             put_vals(f"seg{k}", f"分部{k}（待填）营收", lambda p: None, U, F_AMT)
-            ws.cell(row=r - 1, column=1).fill = L2_FILL
             put_f(f"segp{k}", f"分部{k}（待填）占比",
                   lambda p, i, k=k: guard(f"{A(f'seg{k}', p, i)}/{A('rev', p, i)}", [A(f"seg{k}", p, i), A("rev", p, i)]),
                   "%", F_PCT)
-        ws.column_dimensions["A"].width = 30
-        for p in qs:
-            ws.column_dimensions[qc[p]].width = 12
 
     # ---- 市值与估值
     def sheet_valuation(self):
@@ -764,11 +792,11 @@ class Builder:
         title(ws, f"{ex.code} 市值与估值（逐财年年末）",
               "收盘价 = 财年期末日当天或之前最后一个交易日的收盘价（拆股调整价，美元）；股数 = 长表有期末股数的年份用期末股数，"
               "没有的年份退回当年基本加权股数（'年度三表'推算，富途每股收益已按拆股调整，与拆股调整价同口径），'股数口径'列逐年注明；"
-              "市值 = 收盘价 × 股数 ÷ 100（亿美元）；"
+              "市值 = 收盘价 × 股数（亿股），单位亿美元；"
               "总债务 = 短期债务 + 长期债务（不含租赁，缺数按 0）；现金 = 现金及短期投资；EV = 市值 + 总债务 − 现金；"
               "P/E 用当年稀释每股收益，亏损年份留空；年内最高 / 最低市值 = 财年内每日收盘价 × 当年股数。"
               + ("" if usd else f"财报为 {self.cur} 原币、股价为美元，未换算：EV 与各倍数留空。"))
-        cols = ["年度", "财年期末日", "年末交易日", "收盘价（美元）", "股数（百万股）", "股数口径", "市值（亿美元）",
+        cols = ["年度", "财年期末日", "年末交易日", "收盘价（美元）", "股数（亿股）", "股数口径", "市值（亿美元）",
                 f"总债务（{U}）", f"现金及短期投资（{U}）", "企业价值（亿美元）", f"稀释每股收益（{CUR_NAME.get(self.cur, self.cur)}）",
                 "P/E", f"营收（{U}）", "P/S", f"EBITDA（{U}）", "EV/EBITDA", f"FCF（{U}）", "FCF 收益率",
                 "年内最高市值（亿美元）", "最高日", "年内最低市值（亿美元）", "最低日", "数据提供方市值（亿美元）",
@@ -777,7 +805,6 @@ class Builder:
         V = {c: get_column_letter(i + 1) for i, c in enumerate(cols)}
         self.vcol = V
         self.vrow = {}
-        ws.freeze_panes = "C5"
         self.mcap_py = {}
         for i, y in enumerate(self.years):
             r = 5 + i
@@ -785,6 +812,7 @@ class Builder:
             c = lambda name: f"{V[name]}{r}"
             end = dt.date.fromisoformat(ex.meta[ex.aper[y]]["end"])
             ws[c("年度")] = y
+            ws[c("年度")].number_format = F_YEAR
             ws[c("财年期末日")] = end
             ws[c("财年期末日")].number_format = F_DATE
             pt = price_on_or_before(self.px, end)
@@ -797,17 +825,17 @@ class Builder:
                 notes.append("日线未覆盖该财年末")
             es, es_item, es_why = ex.end_shares(ex.aper[y])
             if es:
-                ws[c("股数（百万股）")] = es
+                ws[c("股数（亿股）")] = es
                 ws[c("股数口径")] = f"期末股数（{es_item}）"
                 self.share_basis[y] = "期末"
             else:
-                ws[c("股数（百万股）")] = guard(self.T("sh_b", y), [self.T("sh_b", y)])
+                ws[c("股数（亿股）")] = guard(self.T("sh_b", y), [self.T("sh_b", y)])
                 ws[c("股数口径")] = "基本加权股数（推算）"
                 self.share_basis[y] = "加权"
                 if es_why:
                     notes.append(es_why)
-            P, S = c("收盘价（美元）"), c("股数（百万股）")
-            ws[c("市值（亿美元）")] = guard(f"{P}*{S}/100", [P, S])
+            P, S = c("收盘价（美元）"), c("股数（亿股）")
+            ws[c("市值（亿美元）")] = guard(f"{P}*{S}", [P, S])
             ws[c(f"总债务（{U}）")] = f"=N({self.T('std', y)})+N({self.T('ltd', y)})"
             ws[c(f"现金及短期投资（{U}）")] = guard(self.T("cash_sti", y), [self.T("cash_sti", y)])
             M, Dbt, Cs = c("市值（亿美元）"), c(f"总债务（{U}）"), c(f"现金及短期投资（{U}）")
@@ -827,14 +855,14 @@ class Builder:
                 ws[c("FCF 收益率")] = guard(f"{FC}/{M}", [FC, M])
             sb = es or ex.shares(ex.aper[y], "b")[0]
             if pt and sb:
-                self.mcap_py[y] = pt[1] * sb / 100
+                self.mcap_py[y] = pt[1] * sb
                 start = dt.date.fromisoformat(ex.meta[ex.aper[y - 1]]["end"]) if (y - 1) in ex.aper else end - dt.timedelta(days=365)
                 win = [(d, v) for d, v in self.px if start < d <= end]
                 if win:
                     hi, lo = max(win, key=lambda x: x[1]), min(win, key=lambda x: x[1])
-                    ws[c("年内最高市值（亿美元）")] = hi[1] * sb / 100
+                    ws[c("年内最高市值（亿美元）")] = hi[1] * sb
                     ws[c("最高日")] = hi[0]
-                    ws[c("年内最低市值（亿美元）")] = lo[1] * sb / 100
+                    ws[c("年内最低市值（亿美元）")] = lo[1] * sb
                     ws[c("最低日")] = lo[0]
                     for k in ("最高日", "最低日"):
                         ws[c(k)].number_format = F_DATE
@@ -854,13 +882,10 @@ class Builder:
             for name in cols:
                 if name in ("年度", "财年期末日", "年末交易日", "最高日", "最低日", "股数口径", "备注", "来源ID"):
                     continue
-                fmt = F_X if name in ("P/E", "P/S", "EV/EBITDA") else (F_PCT if name in ("FCF 收益率", "差异") else
-                                                                     ("0.0000" if "每股" in name else F_AMT))
+                fmt = (F_X if name in ("P/E", "P/S", "EV/EBITDA") else F_PCT if name in ("FCF 收益率", "差异") else
+                       F_PX if name == "收盘价（美元）" else F_SH if name == "股数（亿股）" else
+                       F_EPS if "每股" in name else F_AMT)
                 ws[c(name)].number_format = fmt
-        for name in cols:
-            ws.column_dimensions[V[name]].width = 12
-        ws.column_dimensions[V["股数口径"]].width = 22
-        ws.column_dimensions[V["备注"]].width = 40
 
     # ---- 市值与营收对比
     def sheet_mcap_vs_rev(self):
@@ -872,13 +897,12 @@ class Builder:
         cols = ["年度", f"{code}市值", "参考公司", "参考公司市值", f"{code}营收", "参考公司营收", f"{code}同比",
                 "参考公司同比", f"{code}市值营收倍数", "参考公司市值营收倍数", "市值比例", "营收比例", "来源ID"]
         hdr(ws, 3, cols)
-        for col in (3, 4, 6, 8, 10, 11, 12):
-            ws.cell(row=3, column=col).fill = L2_FILL
         self.mrow = {}
         for i, y in enumerate(self.years):
             r = 4 + i
             self.mrow[y] = r
             ws[f"A{r}"] = y
+            ws[f"A{r}"].number_format = F_YEAR
             mv = f"{q('市值与估值')}{self.vcol['市值（亿美元）']}{self.vrow[y]}"
             ws[f"B{r}"] = guard(mv, [mv])
             rv = f"{q('历年营收与业务拆分')}C{self.rev_row[y]}"
@@ -895,8 +919,7 @@ class Builder:
             for col, fmt in zip("BDEFGHIJKL", [F_AMT, F_AMT, F_AMT, F_AMT, F_PCT, F_PCT, F_X, F_X, F_PCT, F_PCT]):
                 ws[f"{col}{r}"].number_format = fmt
         # 同行横向比较（第二层，从行业报告填）
-        ws["O3"] = "同行横向比较（第二层：从行业报告填；第一行为本公司最新财年，自动）"
-        ws["O3"].font = BOLD
+        section(ws, "O3", "同行横向比较（第二层：从行业报告填；第一行为本公司最新财年，自动）")
         hdr(ws, 4, ["公司", f"营收（最新财年，{self.U}）", "营业利润率", "市值（亿美元）", "来源ID"], col=15)
         y = self.years[-1]
         ws["O5"] = code
@@ -909,12 +932,6 @@ class Builder:
             ws[f"P{r}"].number_format = F_AMT
             ws[f"Q{r}"].number_format = F_PCT
             ws[f"R{r}"].number_format = F_AMT
-            if r > 5:
-                for col in "OPQRS":
-                    ws[f"{col}{r}"].fill = L2_FILL
-        ws.column_dimensions["O"].width = 14
-        for col in "BCDEFGHIJKLPQR":
-            ws.column_dimensions[col].width = 12
 
     # ---- 股价事件
     def sheet_events(self):
@@ -924,7 +941,8 @@ class Builder:
         title(ws, f"{ex.code} 股价事件（单日 ±8% 或 21 个交易日 ±20%）",
               f"日线：{self.pxinfo['basis']}，{self.pxinfo['start']} 至 {self.pxinfo['end']}。21 日事件：连续触发的交易日（同方向、间隔 ≤ 5 天）"
               "合并为一次，取幅度绝对值最大的那天，窗口起始日 = 该日往前 21 个交易日。同日大盘幅度：没有指数数据，写'待补'。"
-              "事件类型留空，由公司报告填写。右侧 K–L 列为月末收盘价，供图表总览的股价事件标注图使用。")
+              "事件类型留空，由公司报告填写。右侧 K–M 列为月末收盘价与月份（文本 YYYY-MM），供图表总览的股价图使用；"
+              "事件不画进图里，看本表。")
         hdr(ws, 4, ["日期", "触发规则", "幅度", "收盘价（美元）", "窗口起始日", "同日大盘幅度", "事件类型", "备注", "来源ID"])
         for i, e in enumerate(ev):
             r = 5 + i
@@ -934,7 +952,7 @@ class Builder:
             ws[f"C{r}"] = e["move"]
             ws[f"C{r}"].number_format = F_PCT
             ws[f"D{r}"] = e["close"]
-            ws[f"D{r}"].number_format = "0.0000" if e["close"] < 1 else F_PX
+            ws[f"D{r}"].number_format = F_PX
             ws[f"E{r}"] = e["start"]
             ws[f"E{r}"].number_format = F_DATE
             ws[f"F{r}"] = "待补"
@@ -942,7 +960,7 @@ class Builder:
                 ws[f"H{r}"] = f"连续触发 {e['span'][0]} 至 {e['span'][1]}"
             ws[f"I{r}"] = "F2"
         self.ev_last = 4 + max(1, len(ev))
-        hdr(ws, 4, ["月末日期", "月末收盘（美元）"], col=11)
+        hdr(ws, 4, ["月末日期", "月末收盘（美元）", "月份"], col=11)
         months = OrderedDict()
         for d, v in self.px:
             months[(d.year, d.month)] = (d, v)
@@ -951,10 +969,9 @@ class Builder:
             ws[f"K{r}"] = d
             ws[f"K{r}"].number_format = F_DATE
             ws[f"L{r}"] = v
-            ws[f"L{r}"].number_format = "0.0000" if v < 1 else F_PX
+            ws[f"L{r}"].number_format = F_PX
+            ws[f"M{r}"] = f"{d.year:04d}-{d.month:02d}"
         self.month_last = 4 + max(1, len(months))
-        for col, w in zip("ABCDEFGHIKL", [12, 9, 9, 12, 12, 12, 14, 36, 8, 12, 14]):
-            ws.column_dimensions[col].width = w
 
     # ---- 所得税与现金税
     def sheet_tax(self):
@@ -976,14 +993,12 @@ class Builder:
         hdr(ws, 3, cols)
         X = {c: get_column_letter(i + 1) for i, c in enumerate(cols)}
         auto = {"所得税费用", "税前利润", "当期所得税费用", "递延所得税费用"}
-        for b in base:
-            if b not in auto:
-                ws[f"{X[f'{b}（{U}）']}3"].fill = L2_FILL
         rows = {}
         for i, y in enumerate(self.years):
             r = 4 + i
             rows[y] = r
             ws[f"A{r}"], ws[f"B{r}"], ws[f"C{r}"] = y, "全年", y
+            ws[f"A{r}"].number_format = ws[f"C{r}"].number_format = F_YEAR
             c = lambda name: f"{X[name]}{r}"
             ws[c(f"所得税费用（{U}）")] = guard(self.T("tax", y), [self.T("tax", y)])
             ws[c(f"税前利润（{U}）")] = guard(self.T("pti", y), [self.T("pti", y)])
@@ -1014,9 +1029,6 @@ class Builder:
         for i, k in enumerate(["上市日期", "发行价与发行股数", "募资额（总额 / 净额）", "发行后总股本", "发行价对应市值",
                                "首日收盘与首日涨幅", "首日收盘对应市值", "上市时最近财年营收", "上市时市值营收倍数"]):
             ws[f"A{4 + i}"] = k
-            ws[f"B{4 + i}"].fill = L2_FILL
-        ws.column_dimensions["A"].width = 24
-        ws.column_dimensions["B"].width = 60
         for name, heads, note in [
             ("重大融资时间线", ["日期", "融资类型", "金额与币种", "票息、期限与口径", "来源"],
              "金额保留原币与本金 / 净款口径。"),
@@ -1027,26 +1039,23 @@ class Builder:
             ws = self.ws[name]
             title(ws, name, L2 + note)
             hdr(ws, 3, heads)
-            for col in range(1, len(heads) + 1):
-                ws.column_dimensions[get_column_letter(col)].width = 22
 
     # ---- 图表计算 + 图表总览
     def sheet_calc_and_charts(self):
         calc, ov, ex = self.ws["图表计算"], self.ws["图表总览"], self.ex
         U = self.U
         title(calc, "图表计算（所有图表的数据区）",
-              "全部是公式，引用前面各表；年度块按'图表总览'B2:D2 的起止年份筛选；无数显示 #N/A（图表中为断点）。不要在这里手填数字。")
-        ov["A1"] = f"{ex.code} 图表总览"
-        ov["A1"].font = TITLE
+              "全部是公式，引用前面各表；年度块按'图表总览'B2:D2 的起止年份筛选；无数显示 #N/A（图表中为断点）。"
+              "横轴用文本标签列（年度标签 2024A、季度 2Q25A、月份 YYYY-MM）。不要在这里手填数字。")
+        title(ov, f"{ex.code} 图表总览")
         ov["A2"], ov["C2"] = "起始年份", "结束年份"
         ov["B2"], ov["D2"] = max(self.years[0], self.years[-1] - 19), self.years[-1]
         for k in ("B2", "D2"):
-            ov[k].fill = L2_FILL
-            ov[k].font = BOLD
-        ov["A3"] = (f"使用方法：改 B2、D2 的年份（数据范围 {self.years[0]}–{self.years[-1]}，默认显示最近 20 年，一次最多 {len(self.years)} 年），"
-                    "年度图（第 1–8、11、12 张）随之更新；近 12 季图固定为最新 12 个季度；"
-                    "分部结构图、参考公司市值图、同行比较图在第二层填好后自动出现。估值倍数图不画 > 100 倍的点。数据区在'图表计算'表。")
-        ov["A3"].font = NOTE
+            ov[k].number_format = F_INT
+        mark_note(ov, "A3", f"使用方法：改 B2、D2 的年份（数据范围 {self.years[0]}–{self.years[-1]}，默认显示最近 20 年，一次最多 {len(self.years)} 年），"
+                       "年度图（第 1–8、12 张）随之更新；近 12 季图固定为最新 12 个季度；第 11 张股价图显示日线覆盖的全部月份，"
+                       "股价事件不画进图里，见'股价事件'表；分部结构图、参考公司市值图、同行比较图在第二层填好后自动出现。"
+                       "估值倍数图不画 > 100 倍的点。每张图最多 3 个系列，数据区在'图表计算'表。")
         S, E = f"{q('图表总览')}$B$2", f"{q('图表总览')}$D$2"
         n = len(self.years)
         r0 = 5
@@ -1086,7 +1095,7 @@ class Builder:
             ("收购（业务交易净额）", lambda a: lookup_row("acq", a)),
             ("分红", lambda a: lookup_row("div", a)),
             ("普通股发行/回购净额", lambda a: lookup_row("buyback", a)),
-            ("稀释加权股数（百万股）", lambda a: lookup("年度衍生指标", D["稀释加权股数（百万股）"], "A", d_first, d_last, a)),
+            ("稀释加权股数（亿股）", lambda a: lookup("年度衍生指标", D["稀释加权股数（亿股）"], "A", d_first, d_last, a)),
             ("市值（亿美元）", lambda a: lookup("市值与估值", V["市值（亿美元）"], "A", v_first, v_last, a)),
             ("P/E", lambda a: cap(lookup("市值与估值", V["P/E"], "A", v_first, v_last, a))),
             ("P/S", lambda a: cap(lookup("市值与估值", V["P/S"], "A", v_first, v_last, a))),
@@ -1096,20 +1105,34 @@ class Builder:
         for k, sc in enumerate(self.rev_seg_cols):
             annual.append((f"分部{k + 1}", lambda a, sc=sc: lookup("历年营收与业务拆分", sc, "A", rv_first, rv_last, a)))
         annual.append(("未拆分收入", lambda a: lookup("历年营收与业务拆分", self.rev_un_col, "A", rv_first, rv_last, a)))
-        calc["A3"] = "年度块（按起止年份筛选）"
-        calc["A3"].font = BOLD
+        # 合并列（每张图最多 3 个系列）与文本横轴标签
+        annual += [("分红与回购净额", None), ("其他分部与未拆分", None), ("年度标签", None)]
+        section(calc, "A3", "年度块（按起止年份筛选）")
         hdr(calc, 4, ["年度"] + [a[0] for a in annual])
         ac = {name: get_column_letter(2 + i) for i, (name, _) in enumerate(annual)}
+
+        def sum_na(cols, r):
+            refs = [f"{ac[c]}{r}" for c in cols]
+            return f'=IF(COUNT({",".join(refs)})=0,NA(),{"+".join(f"IFERROR({x},0)" for x in refs)})'
+
         for i in range(n):
             r = r0 + i
             calc[f"A{r}"] = f'=IF({S}+{i}>{E},"",{S}+{i})'
+            calc[f"A{r}"].number_format = F_YEAR
             for name, fn in annual:
-                calc[f"{ac[name]}{r}"] = fn(f"$A{r}")
+                if fn is not None:
+                    calc[f"{ac[name]}{r}"] = fn(f"$A{r}")
+            calc[f"{ac['分红与回购净额']}{r}"] = sum_na(["分红", "普通股发行/回购净额"], r)
+            calc[f"{ac['其他分部与未拆分']}{r}"] = sum_na([f"分部{k + 1}" for k in range(2, len(self.rev_seg_cols))]
+                                                    + ["未拆分收入"], r)
+            calc[f"{ac['年度标签']}{r}"] = f'=IF($A{r}="","",$A{r}&"A")'
+            for name in annual:
+                if name[0] not in ("年度标签",):
+                    calc[f"{ac[name[0]]}{r}"].number_format = F_AMT
         # 季度块
         qc0 = 2 + len(annual) + 1
         Q = lambda j: get_column_letter(qc0 + j)
-        calc[f"{Q(0)}3"] = "近 12 季块"
-        calc[f"{Q(0)}3"].font = BOLD
+        section(calc, f"{Q(0)}3", "近 12 季块")
         qnames = ["季度", "营收", "营收同比", "毛利率", "营业利润率", "净利率"]
         hdr(calc, 4, qnames, col=qc0)
         qkeys = [None, "rev", "yoy_rev", "gm", "opm", "npm"]
@@ -1119,20 +1142,22 @@ class Builder:
             for j, key in enumerate(qkeys[1:], start=1):
                 ref = f"{q('近12季度明细')}{self.qcol[p]}{self.qrow[key]}"
                 calc[f"{Q(j)}{r}"] = f"={NA(ref)}"
+                calc[f"{Q(j)}{r}"].number_format = F_AMT if j == 1 else F_PCT
         qN = r0 + max(1, len(self.q12)) - 1
-        # 月末收盘 + 事件
+        # 月末收盘（全部月份，文本月份标签）+ 事件（只列数，不画进图）
         mc0 = qc0 + len(qnames) + 1
         M = lambda j: get_column_letter(mc0 + j)
-        calc[f"{M(0)}3"] = "股价块（月末收盘与事件，按起止年份筛选）"
-        calc[f"{M(0)}3"].font = BOLD
-        hdr(calc, 4, ["月末日期", "月末收盘", "事件日期", "事件日收盘", "事件幅度"], col=mc0)
+        section(calc, f"{M(0)}3", "股价块（月末收盘，全部月份；事件只列数，不画进图）")
+        hdr(calc, 4, ["月末日期", "月末收盘", "事件日期", "事件日收盘", "事件幅度", "月份"], col=mc0)
         nm = self.month_last - 4
         for i in range(nm):
             r, sr = r0 + i, 5 + i
             dref = f"{q('股价事件')}K{sr}"
             calc[f"{M(0)}{r}"] = f"={dref}"
             calc[f"{M(0)}{r}"].number_format = F_DATE
-            calc[f"{M(1)}{r}"] = f"=IF(OR(YEAR({dref})<{S},YEAR({dref})>{E}),NA(),{q('股价事件')}L{sr})"
+            calc[f"{M(1)}{r}"] = f"={NA(q('股价事件') + 'L' + str(sr))}"
+            calc[f"{M(1)}{r}"].number_format = F_PX
+            calc[f"{M(5)}{r}"] = f"={q('股价事件')}M{sr}"
         ne = max(1, len(self.events))
         for i in range(ne):
             r, sr = r0 + i, 5 + i
@@ -1140,87 +1165,79 @@ class Builder:
             calc[f"{M(2)}{r}"] = f"={dref}"
             calc[f"{M(2)}{r}"].number_format = F_DATE
             calc[f"{M(3)}{r}"] = f'=IF({dref}="",NA(),IF(OR(YEAR({dref})<{S},YEAR({dref})>{E}),NA(),{q("股价事件")}D{sr}))'
+            calc[f"{M(3)}{r}"].number_format = F_PX
             calc[f"{M(4)}{r}"] = f"={NA(q('股价事件') + 'C' + str(sr))}"
             calc[f"{M(4)}{r}"].number_format = F_PCT
         # 同行块
-        pc0 = mc0 + 6
+        pc0 = mc0 + 7
         P = lambda j: get_column_letter(pc0 + j)
-        calc[f"{P(0)}3"] = "同行横向比较块"
-        calc[f"{P(0)}3"].font = BOLD
+        section(calc, f"{P(0)}3", "同行横向比较块")
         hdr(calc, 4, ["公司", "营收", "营业利润率", "市值"], col=pc0)
         for i in range(10):
             r, sr = r0 + i, 5 + i
             calc[f"{P(0)}{r}"] = f'=IF({q("市值与营收对比")}O{sr}="","",{q("市值与营收对比")}O{sr})'
             for j, col in enumerate("PQR", start=1):
                 calc[f"{P(j)}{r}"] = f"={NA(q('市值与营收对比') + col + str(sr))}"
+                calc[f"{P(j)}{r}"].number_format = F_PCT if j == 2 else F_AMT
         for r in range(r0, rN + 1):
             for name in ("营收同比", "毛利率", "营业利润率", "净利率"):
                 calc[f"{ac[name]}{r}"].number_format = F_PCT
-        for r in range(r0, qN + 1):
-            for j in range(2, 6):
-                calc[f"{Q(j)}{r}"].number_format = F_PCT
+            for name in ("P/E", "P/S", "EV/EBITDA"):
+                calc[f"{ac[name]}{r}"].number_format = F_X
+            calc[f"{ac['稀释加权股数（亿股）']}{r}"].number_format = F_SH
 
-        # ---- 图表
-        cats = Reference(calc, min_col=1, min_row=r0, max_row=rN)
+        # ---- 图表（格式规范第 13 节 + SKILL"图表可读性"：文本横轴、≤ 3 个系列、折线无标记点、固定色板）
         col_idx = lambda name: column_index_from_string(ac[name])
+        cats = Reference(calc, min_col=col_idx("年度标签"), min_row=r0, max_row=rN)
 
         def data(names, ws=calc, row0=r0, rowN=rN, idx=col_idx):
             return [Reference(ws, min_col=idx(nm), min_row=4, max_row=rowN) for nm in names]
-
-        def style(ch, t, ytitle=None, yfmt=None):
-            ch.title = t
-            ch.display_blanks = "gap"
-            for s in ch.series:
-                s.smooth = False
-            ch.width, ch.height = 17, 8.5
-            ch.legend.position = "b"
-            ch.x_axis.delete = False
-            ch.y_axis.delete = False
-            if ytitle:
-                ch.y_axis.title = ytitle
-            if yfmt:
-                ch.y_axis.number_format = yfmt
-            return ch
 
         def bar(t, names, ytitle=None, stacked=False, catref=cats, refs=None, yfmt=None):
             ch = BarChart()
             ch.type = "col"
             for ref in (refs or data(names)):
                 ch.add_data(ref, titles_from_data=True)
-            ch.set_categories(catref)
+            set_text_categories(ch, catref)
             if stacked:
                 ch.grouping, ch.overlap = "stacked", 100
-            return style(ch, t, ytitle, yfmt)
+            return finish_chart(ch, t, ytitle, yfmt)
 
-        def line(t, names, ytitle=None, catref=cats, refs=None, yfmt=None):
+        def line(t, names, ytitle=None, catref=cats, refs=None, yfmt=None, log=False):
             ch = LineChart()
             for ref in (refs or data(names)):
                 ch.add_data(ref, titles_from_data=True)
-            ch.set_categories(catref)
-            return style(ch, t, ytitle, yfmt)
+            set_text_categories(ch, catref)
+            if log:
+                ch.y_axis.scaling.logBase = 10
+            return finish_chart(ch, t, ytitle, yfmt)
 
         def combo(t, bnames, lnames, ytitle, y2fmt, catref=cats, brefs=None, lrefs=None):
-            b = bar(t, bnames, ytitle, catref=catref, refs=brefs)
+            b = BarChart()
+            b.type = "col"
+            for ref in (brefs or data(bnames)):
+                b.add_data(ref, titles_from_data=True)
+            set_text_categories(b, catref)
             ln = LineChart()
             for ref in (lrefs or data(lnames)):
                 ln.add_data(ref, titles_from_data=True)
-            for s in ln.series:
-                s.smooth = False
+            set_text_categories(ln, catref)
             ln.y_axis.axId = 200
             ln.y_axis.crosses = "max"
             ln.y_axis.number_format = y2fmt
             ln.y_axis.delete = False
-            ln.y_axis.majorGridlines = None
             b += ln
-            return b
+            return finish_chart(b, t, ytitle)
 
         charts = []
         charts.append(combo(f"1 营收（{U}）与同比", ["营收"], ["营收同比"], U, "0%"))
-        charts.append(bar(f"2 分部结构（{U}，第二层填好后出现）", [f"分部{k + 1}" for k in range(len(self.rev_seg_cols))] + ["未拆分收入"], U, stacked=True))
+        charts.append(bar(f"2 分部结构（{U}，第二层填好后出现；分部 1、2 填最大的两块）",
+                          ["分部1", "分部2", "其他分部与未拆分"], U, stacked=True))
         charts.append(line("3 利润率带", ["毛利率", "营业利润率", "净利率"], yfmt="0%"))
-        charts.append(bar(f"4 现金流去向（{U}，流出为负）", ["经营现金流", "资本开支", "收购（业务交易净额）", "分红", "普通股发行/回购净额"], U))
+        charts.append(bar(f"4 现金流去向（{U}，流出为负）", ["资本开支", "收购（业务交易净额）", "分红与回购净额"], U,
+                          stacked=True))
         charts.append(line(f"5 资本开支 vs 经营现金流（{U}）", ["经营现金流", "资本开支（正数）"], U))
-        charts.append(combo("6 稀释股数（百万股）与发行 / 回购净额", ["稀释加权股数（百万股）"], ["普通股发行/回购净额"], "百万股", "#,##0"))
+        charts.append(combo("6 稀释股数（亿股）与发行 / 回购净额", ["稀释加权股数（亿股）"], ["普通股发行/回购净额"], "亿股", "#,##0.0"))
         charts.append(line(f"7 市值（亿美元）vs 营收（{U}）", ["市值（亿美元）", "营收"]))
         charts.append(line("8 估值倍数带", ["P/E", "P/S", "EV/EBITDA"], yfmt="0.0"))
         qidx = lambda nm: qc0 + qnames.index(nm)
@@ -1228,38 +1245,19 @@ class Builder:
         charts.append(combo(f"9 近 12 季营收（{U}）与同比", None, None, U, "0%", catref=qcats,
                             brefs=data(["营收"], rowN=qN, idx=qidx), lrefs=data(["营收同比"], rowN=qN, idx=qidx)))
         charts.append(line("10 近 12 季利润率", None, catref=qcats, refs=data(["毛利率", "营业利润率", "净利率"], rowN=qN, idx=qidx), yfmt="0%"))
-        sc = ScatterChart()
-        sc.style = 13
-        xs = Reference(calc, min_col=mc0, min_row=r0, max_row=r0 + nm - 1)
-        ys = Reference(calc, min_col=mc0 + 1, min_row=r0, max_row=r0 + nm - 1)
-        s1 = Series(ys, xs, title="月末收盘（拆股调整，美元）")
-        s1.marker.symbol = "none"
-        sc.series.append(s1)
-        xe = Reference(calc, min_col=mc0 + 2, min_row=r0, max_row=r0 + ne - 1)
-        ye = Reference(calc, min_col=mc0 + 3, min_row=r0, max_row=r0 + ne - 1)
-        s2 = Series(ye, xe, title="股价事件（单日 ±8% / 21 日 ±20%）")
-        s2.marker.symbol = "circle"
-        s2.marker.size = 5
-        s2.marker.graphicalProperties = GraphicalProperties(solidFill="C00000")
-        s2.marker.graphicalProperties.line.solidFill = "C00000"
-        s2.graphicalProperties.line.noFill = True
-        s1.graphicalProperties.line.solidFill = "1F4E79"
-        s1.graphicalProperties.line.width = 15000
-        sc.series.append(s2)
-        sc.x_axis.number_format = "yyyy"
-        sc.y_axis.scaling.logBase = 10
-        style(sc, "11 股价与事件标注（对数坐标）", "美元")
-        charts.append(sc)
+        mcats = Reference(calc, min_col=mc0 + 5, min_row=r0, max_row=r0 + nm - 1)
+        mref = [Reference(calc, min_col=mc0 + 1, min_row=4, max_row=r0 + nm - 1)]
+        charts.append(line("11 股价（月末收盘，美元，拆股调整，对数坐标；事件见'股价事件'表）", None, "美元",
+                           catref=mcats, refs=mref, log=True))
         charts.append(line("12 市值对比：本公司 vs 参考公司（亿美元，参考公司第二层）", ["市值（亿美元）", "参考公司市值"]))
         pidx = lambda nm: pc0 + ["公司", "营收", "营业利润率", "市值"].index(nm)
         pcats = Reference(calc, min_col=pc0, min_row=r0, max_row=r0 + 9)
         charts.append(bar("13 同行横向比较：营收（第二层，从行业报告填）", None, catref=pcats,
                           refs=data(["营收"], rowN=r0 + 9, idx=pidx)))
         for i, ch in enumerate(charts):
-            anchor = f"{'A' if i % 2 == 0 else 'K'}{5 + (i // 2) * 18}"
+            anchor = f"{'A' if i % 2 == 0 else 'H'}{5 + (i // 2) * 18}"
             ov.add_chart(ch, anchor)
         self.expected_charts = len(charts)
-        ov.column_dimensions["A"].width = 10
 
     # ---- 说明 / 缺口 / 来源
     def sheet_notes(self):
@@ -1274,13 +1272,21 @@ class Builder:
             ("代码", ex.code),
             ("财报币种", f"{self.cur}（{CUR_NAME.get(self.cur, self.cur)}）" + ("" if self.usd else "：原币，未换算成美元；股价、市值为美元")),
             ("股价币种", "美元（美股交易价）"),
-            ("财年口径", f"FY 标签 = 年报期末日所在年份（期末日落在 1 月 1–7 日的算上一年），与富途'财年'列一致；"
+            ("财年口径", f"财年 = 年报期末日所在年份（期末日落在 1 月 1–7 日的算上一年），与富途'财年'列一致；"
+                     "期间标签按格式规范：年度显示 2024A（单元格数值仍是 2024，显示格式 0\"A\"，公式与年份筛选按数值匹配），"
+                     "季度写 2Q25A（FY2025 第 2 季度）；历史数据全部是实际数，没有 E；"
                      f"近 4 个年报期末日：{'、'.join(ends)}（年报期末月份：{'、'.join(f'{m} 月' for m in months)}）；季度的 FY 标签跟所属年报走。"),
             ("覆盖年限", f"年度 FY{self.years[0]}–FY{self.years[-1]}（{len(self.years)} 年）；季度 {ex.label(ex.quarters[0])}–{ex.label(lq)}（共 {len(ex.quarters)} 期）" if lq else f"年度 FY{self.years[0]}–FY{self.years[-1]}"),
             ("最新年报", f"{ex.label(ex.aper[self.years[-1]])}，期末日 {ex.meta[ex.aper[self.years[-1]]]['end']}"),
             ("最新季报（近12季度明细的最新一季）", f"{ex.label(lq)}，期末日 {ex.meta[lq]['end']}" if lq else "无季报"),
             ("报告类型编号", "7 = 全财年（年报）；1/2/3/4 = 财年第 1–4 季度的单季数（不是累计）；资产负债表为期末时点数。"),
-            ("单位约定", f"金额 {self.U}（富途原值 ÷ 1e8）；股数百万股；占比与同比 %；空白 ≠ 0（富途无数或输入缺数）；新旧分类不可相加。"),
+            ("单位约定", f"金额 {self.U}（富途原值 ÷ 1e8）；股数亿股；股价美元；占比与同比 %；空白 ≠ 0（富途无数或输入缺数）；新旧分类不可相加。"),
+            ("格式", "按格式规范 Part B：默认 Arial 10 pt，含中文的单元格用 Noto Sans SC（一个单元格只能有一种字体，openpyxl 不能分设中西文字体）；"
+                   "字体颜色 蓝 = 手输常数、黑 = 本表公式、绿 = 跨表引用、红 = 外部工作簿；主标题 #17365D 白字、分区标题 #D9EAF7、列标题 #1F4E78 白字、"
+                   "隔行 #F7F9FB、辅助说明灰字 #808080；金额 1 位小数、负数括号、零值短横线；隐藏网格线、冻结第 1 行与 A 列；"
+                   "列宽 A 260 px、其余 100 px、长文本列 120 px（按 Google 表格的列宽换算写，Excel 里看会窄约 12%）；"
+                   "行高 20 px、主标题 28 px、分区与列标题 22 px，"
+                   "列标题与长文本放不进一行时按行数加高（超过 8 行的长文本不换行）；主标题行不合并（合并会和冻结 A 列冲突）。"),
             ("数据口径", "富途导出是最新口径（含后续重列），不是首次披露；与原报对账时差异可能来自重列。"
                      + ("" if ex.date_fixed_col else "本长表没有'日期已校正'列，美股期末日可能比真实期末日早一天。")),
             ("日线", f"{self.pxinfo['basis']}；{self.pxinfo['start']} 至 {self.pxinfo['end']}"
@@ -1301,8 +1307,7 @@ class Builder:
             ws[f"B{r}"].alignment = WRAP
             r += 1
         r += 1
-        ws[f"A{r}"] = "各表口径与缺口"
-        ws[f"A{r}"].font = BOLD
+        section(ws, f"A{r}", "各表口径与缺口")
         r += 1
         hdr(ws, r, ["工作表", "口径", "缺口 / 层级"])
         r += 1
@@ -1330,12 +1335,7 @@ class Builder:
         ]
         for s, a, b in sheets:
             ws[f"A{r}"], ws[f"B{r}"], ws[f"C{r}"] = s, a, b
-            ws[f"B{r}"].alignment = WRAP
-            ws[f"C{r}"].alignment = WRAP
             r += 1
-        ws.column_dimensions["A"].width = 26
-        ws.column_dimensions["B"].width = 100
-        ws.column_dimensions["C"].width = 40
 
     def share_basis_text(self):
         ex = self.ex
@@ -1390,15 +1390,12 @@ class Builder:
                              "yfinance / 券商行情", "1", "F2"))
         for i, rr in enumerate(rows):
             for j, v in enumerate(rr):
-                ws.cell(row=4 + i, column=1 + j, value=v).alignment = WRAP
-        for col, w in zip("ABCDEF", [28, 30, 50, 36, 10, 14]):
-            ws.column_dimensions[col].width = w
+                ws.cell(row=4 + i, column=1 + j, value=v)
 
     def sheet_sources(self):
         ws, ex = self.ws["来源"], self.ex
         title(ws, "来源", "来源 ID 对应各表最后一列。路径相对于 futu_export 根目录（Drive：计算机 › 我的 Mac › futu_export）。")
-        ws["A3"] = "财务数据来源"
-        ws["A3"].font = BOLD
+        section(ws, "A3", "财务数据来源")
         hdr(ws, 4, ["来源ID", "文件", "网址 / 位置", "表格或页码定位"])
         rows = [("F1", ex.long_file, f"{ex.code}/{ex.long_file}（富途 OpenD 导出，文件日期 {ex.long_mtime}）",
                  "报表 × 期间 × 科目；报告类型 7 = 年报，1–4 = 单季"),
@@ -1411,15 +1408,13 @@ class Builder:
             for j, v in enumerate(rr):
                 ws.cell(row=5 + i, column=1 + j, value=v)
         r = 7 + len(rows)
-        ws[f"A{r}"] = "市值与参考公司来源"
-        ws[f"A{r}"].font = BOLD
+        section(ws, f"A{r}", "市值与参考公司来源")
         hdr(ws, r + 1, ["年度", f"{ex.code}营收来源", f"{ex.code}市值来源", "参考公司市值来源", "参考公司营收来源", "参考公司营收口径"])
         for i, y in enumerate(self.years):
             rr = r + 2 + i
             ws[f"A{rr}"], ws[f"B{rr}"] = y, "F1"
+            ws[f"A{rr}"].number_format = F_YEAR
             ws[f"C{rr}"] = "F2 收盘价 × F1 期末股数" if self.share_basis.get(y) == "期末" else "F2 收盘价 × F1 推算基本加权股数"
-        for col, w in zip("ABCDEF", [10, 40, 60, 40, 30, 30]):
-            ws.column_dimensions[col].width = w
 
     def build(self, out_path):
         self.sheet_statements()
@@ -1435,10 +1430,248 @@ class Builder:
         self.sheet_notes()
         self.sheet_gaps()
         self.sheet_sources()
+        for ws in self.wb.worksheets:
+            format_sheet(ws)
         self.wb.calculation.fullCalcOnLoad = True
         self.wb.save(out_path)
         return out_path
 
+
+# ---------------------------------------------------------------- 格式（格式规范 Part B）
+def set_default_font(wb):
+    """工作簿默认字体 Arial 10（Normal 样式与 0 号字体）。"""
+    f = Font(name=LATIN_FONT, sz=FONT_PT, family=2)
+    wb._fonts = IndexedList([f])
+    wb._named_styles["Normal"].font = f
+
+
+def px_to_width(px):
+    """列宽像素 → xlsx 列宽。按 Google 表格的换算写：转换时 Google 把列宽 w 换成约 ⌊8w − 0.5⌋ 像素
+    （2026-11-04 实测 6 个点：w = 260/7、100/7、120/7 → 296、113、136 px；w = 261.5/8、101.5/8、121.5/8 →
+    261、101、121 px），所以取 w = (px + 1) / 8，落在取整区间正中，转换后正好是规范的 260 / 100 / 120 px。
+    在 Excel、LibreOffice 里看会窄约 12%（它们按 7 px 一个字符宽）。"""
+    return (px + 1) / 8
+
+
+def width_to_px(w):
+    """xlsx 列宽 → 转换为 Google 表格后的像素。"""
+    return int(w * 8 - 0.5)
+
+
+def text_px(s, size=FONT_PT):
+    w = 0.0
+    for ch in str(s):
+        if CJK_RE.match(ch) or ord(ch) > 0x2E80:
+            w += 1.0
+        elif ch in " .,:;'|!il":
+            w += 0.3
+        elif ch.isdigit() or ch.isupper() or ch in "$%-+()#&":
+            w += 0.6
+        else:
+            w += 0.52
+    return w * size * 96 / 72
+
+
+def lines_needed(text, col_px):
+    return max(1, -(-int(text_px(text)) // max(1, col_px - 8)))
+
+
+REF_SHEET = re.compile(r"(\[[^\]]+\])?(?:'((?:[^']|'')+)'|([A-Za-z_一-鿿][\w.一-鿿]*))!")
+
+
+def formula_kind(v, sheet):
+    """单元格内容 → 颜色类别：input（手输常数）、formula（本表公式）、link（跨表引用）、external（外部工作簿）、text。"""
+    if isinstance(v, str) and v.startswith("="):
+        kind = "formula"
+        for m in REF_SHEET.finditer(v):
+            if m.group(1):
+                return "external"
+            name = (m.group(2) or "").replace("''", "'") or m.group(3)
+            if name != sheet:
+                kind = "link"
+        return kind
+    if isinstance(v, bool) or v is None:
+        return "text"
+    if isinstance(v, (int, float, dt.date, dt.datetime)):
+        return "input"
+    return "text"
+
+
+KIND_COLOR = {"input": C_INPUT, "formula": C_FORMULA, "link": C_LINK, "external": C_EXT, "text": C_FORMULA}
+THIN_TOP = Border(top=Side(style="thin", color="000000"))
+
+
+def cell_font(v, color, bold=False):
+    name = CJK_FONT if isinstance(v, str) and not v.startswith("=") and CJK_RE.search(v) else LATIN_FONT
+    return Font(name=name, size=FONT_PT, bold=bold, color=color)
+
+
+def format_sheet(ws):
+    """按格式规范 Part B 给一张表上格式：工作表设置、列宽行高、字体颜色、底色、合计行。
+    角色（主标题、列标题、分区标题、辅助说明）由 hdr / section / note / title 登记；其余按单元格内容判定。"""
+    rl = roles(ws)
+    ws.sheet_view.showGridLines = False
+    ws.sheet_view.zoomScale = 100
+    ws.freeze_panes = "B2"
+    ws.sheet_properties.tabColor = TAB_COLOR
+    for rng in list(ws.merged_cells.ranges):
+        if rng.min_row != 1 or rng.max_row != 1:
+            ws.unmerge_cells(str(rng))
+    cells = {}
+    for row in ws.iter_rows():
+        for c in row:
+            if c.value is not None:
+                cells[c.coordinate] = c
+    max_col = max([c.column for c in cells.values()] + [1])
+    max_row = max([c.row for c in cells.values()] + [1, ws.max_row])
+    header, sect, notes = rl["header"], rl["section"], rl["note"]
+    special = header | sect | notes
+    # 列宽：A 列 260 px；其余 100 px；有长文本（数据区里放不进 100 px 的文字）的列 120 px
+    long_cols = set()
+    for c in cells.values():
+        if c.column > 1 and c.row not in rl["title"] and c.coordinate not in special and isinstance(c.value, str) \
+                and not c.value.startswith("=") and text_px(c.value) > PX_COL - 8:
+            long_cols.add(c.column)
+    col_px = {1: PX_A}
+    for j in range(2, max_col + 1):
+        col_px[j] = PX_LONG if j in long_cols else PX_COL
+    ws.sheet_format.defaultColWidth = px_to_width(PX_COL)
+    ws.sheet_format.defaultRowHeight = PX_ROW * 0.75
+    ws.sheet_format.customHeight = True
+    for j, px in col_px.items():
+        ws.column_dimensions[get_column_letter(j)].width = px_to_width(px)
+    # 行：主标题 28 px；列标题、分区标题 22 px（列标题文字放不下一行时按行数加高）；其余 20 px，长文本换行按行数加高
+    by_row = defaultdict(list)
+    for c in cells.values():
+        by_row[c.row].append(c)
+    first_hdr = min([ws[k].row for k in header] + [max_row + 1])
+    band, parity = PatternFill("solid", fgColor=C_BAND), 0
+    title_fill = PatternFill("solid", fgColor=C_TITLE)
+    hdr_fill = PatternFill("solid", fgColor=C_HDR)
+    sec_fill = PatternFill("solid", fgColor=C_SEC_BG)
+    for r in range(1, max_row + 1):
+        rc = by_row.get(r, [])
+        if r in rl["title"]:
+            for j in range(1, max_col + 1):
+                c = ws.cell(row=r, column=j)
+                c.fill = title_fill
+                c.font = Font(name=CJK_FONT if CJK_RE.search(str(c.value or "")) else LATIN_FONT, size=FONT_PT,
+                              bold=True, color=C_WHITE)
+                c.alignment = Alignment(vertical="center")
+            ws.row_dimensions[r].height = PX_TITLE * 0.75
+            continue
+        hcells = [c for c in rc if c.coordinate in header]
+        scells = [c for c in rc if c.coordinate in sect]
+        px = PX_ROW
+        if hcells:
+            lines = max(lines_needed(c.value, col_px[c.column]) for c in hcells)
+            px = PX_HEAD if lines == 1 else PX_LINE * lines + 2
+            for c in hcells:
+                c.fill = hdr_fill
+                c.font = Font(name=CJK_FONT if CJK_RE.search(str(c.value)) else LATIN_FONT, size=FONT_PT, bold=True,
+                              color=C_WHITE)
+                c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            parity = 0
+        if scells:
+            only = all(c.coordinate in sect for c in rc)
+            targets = [ws.cell(row=r, column=j) for j in range(1, max_col + 1)] if only else scells
+            for c in targets:
+                c.fill = sec_fill
+                c.font = Font(name=CJK_FONT if CJK_RE.search(str(c.value or "")) else LATIN_FONT, size=FONT_PT,
+                              bold=True, color=C_SEC_FG)
+            px = max(px, PX_HEAD)
+            parity = 0
+        data = [c for c in rc if c.coordinate not in special]
+        if not rc:
+            parity = 0
+        banded = bool(data) and r > first_hdr and not hcells
+        if banded:
+            parity += 1
+        first = next((c for c in sorted(rc, key=lambda x: x.column)), None)
+        total = first is not None and isinstance(first.value, str) and first.value.strip().startswith(("合计", "总计"))
+        if banded and parity % 2 == 0:
+            for j in range(1, max_col + 1):
+                c = ws.cell(row=r, column=j)
+                if c.coordinate not in special:
+                    c.fill = band
+        for c in rc:
+            if c.coordinate in notes:
+                c.font = cell_font(c.value, C_NOTE)
+                continue
+            if c.coordinate in header or c.coordinate in sect:
+                continue
+            kind = formula_kind(c.value, ws.title)
+            if kind == "input" and c.column == 1:
+                kind = "text"  # A 列是行标签（年份等），不是输入
+            c.font = cell_font(c.value, KIND_COLOR[kind], bold=total)
+            wrap = False
+            if isinstance(c.value, str) and not c.value.startswith("=") and c.column in long_cols:
+                n = lines_needed(c.value, col_px[c.column])
+                if n <= MAX_WRAP_LINES:
+                    wrap = True
+                    px = max(px, PX_LINE * n)
+            c.alignment = Alignment(horizontal=c.alignment.horizontal, wrap_text=wrap, vertical="center")
+        if total:
+            for j in range(1, max_col + 1):
+                ws.cell(row=r, column=j).border = THIN_TOP
+        ws.row_dimensions[r].height = px * 0.75
+
+
+def _txpr(sz, bold=False):
+    cp = CharacterProperties(sz=sz, b=bold, latin=DFont(typeface=LATIN_FONT), ea=DFont(typeface=CJK_FONT))
+    return RichText(p=[Paragraph(pPr=ParagraphProperties(defRPr=cp), endParaRPr=cp)])
+
+
+def _rich_title(text, sz, bold, left=False):
+    cp = CharacterProperties(sz=sz, b=bold, latin=DFont(typeface=LATIN_FONT), ea=DFont(typeface=CJK_FONT))
+    para = Paragraph(pPr=ParagraphProperties(algn="l" if left else None, defRPr=cp), r=[RegularTextRun(rPr=cp, t=text)])
+    t = Title(tx=Text(rich=RichText(p=[para])), overlay=False)
+    if left:
+        t.layout = Layout(manualLayout=ManualLayout(xMode="edge", yMode="edge", x=0.01, y=0.01))
+    return t
+
+
+def set_text_categories(ch, ref):
+    """横轴用文本类别（strRef 指向文本标签列）。"""
+    from openpyxl.chart.data_source import AxDataSource, StrRef
+    for s in ch.series:
+        s.cat = AxDataSource(strRef=StrRef(f=str(ref)))
+
+
+def finish_chart(ch, title_text, ytitle=None, yfmt=None):
+    """格式规范第 13 节：白底、无边框、无阴影、无三维；标题 Arial 10 加粗左对齐；坐标轴与图例 9 pt、图例底部居中；
+    网格线 #D9D9D9（Excel / Google 表格里网格线总在数据后面）；系列按色板上色；折线无标记点、不平滑。"""
+    from openpyxl.chart.marker import Marker
+    ch.title = _rich_title(title_text, 1000, True, left=True)
+    ch.display_blanks = "gap"
+    ch.width, ch.height = 17, 8.5
+    ch.roundedCorners = False
+    ch.graphical_properties = GraphicalProperties(solidFill="FFFFFF", ln=LineProperties(noFill=True))
+    ch.plot_area.graphicalProperties = GraphicalProperties(noFill=True, ln=LineProperties(noFill=True))
+    ch.legend.position = "b"
+    ch.legend.overlay = False
+    ch.legend.txPr = _txpr(900)
+    k = 0
+    for sub in ch._charts:
+        for ax in (sub.x_axis, sub.y_axis):
+            ax.delete = False
+            ax.txPr = _txpr(900)
+            ax.majorGridlines = None
+        for s in sub.series:
+            color = CHART_COLORS[k % len(CHART_COLORS)]
+            k += 1
+            if sub.tagname == "barChart":
+                s.graphicalProperties = GraphicalProperties(solidFill=color, ln=LineProperties(noFill=True))
+            else:
+                s.graphicalProperties = GraphicalProperties(ln=LineProperties(solidFill=color, w=19050))
+                s.marker = Marker(symbol="none")
+                s.smooth = False
+    ch.y_axis.majorGridlines = ChartLines(spPr=GraphicalProperties(ln=LineProperties(solidFill=GRID_COLOR, w=6350)))
+    if ytitle:
+        ch.y_axis.title = _rich_title(ytitle, 900, False)
+    if yfmt:
+        ch.y_axis.number_format = yfmt
+    return ch
 
 # ---------------------------------------------------------------- 公式求值（验收用，覆盖本脚本生成的公式子集）
 class XErr(Exception):
@@ -1452,6 +1685,15 @@ TOK = re.compile(r"""\s*(?:
   (?P<fn>[A-Z][A-Z0-9\.]*)\(|
   (?P<op><>|<=|>=|[-+*/^&=<>(),%])
 )""", re.X)
+
+
+def _txt(v):
+    """公式里 & 拼接的文本：整数值的浮点数按整数写（2024.0 → "2024"），与 Excel 一致。"""
+    if v is None:
+        return ""
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v)
 
 
 class Evaluator:
@@ -1580,7 +1822,10 @@ class Evaluator:
     def rng(self, node):
         _, sh, c = node
         if ":" not in c:
-            return [self.cell(sh, c)]
+            try:
+                return [self.cell(sh, c)]
+            except XErr as e:  # 与 Excel 一致：COUNT 等对单格引用里的错误值同样跳过
+                return [e]
         a, b = c.split(":")
         ws = self.wb[sh]
         out = []
@@ -1635,7 +1880,7 @@ class Evaluator:
                     raise XErr("#DIV/0!")
                 return x / y
             if op == "&":
-                return f"{'' if a is None else a}{'' if b is None else b}"
+                return f"{_txt(a)}{_txt(b)}"
             for v in (a, b):
                 if isinstance(v, XErr):
                     raise v
@@ -1799,7 +2044,7 @@ def run_checks(xlsx, ex, ref_mcap=None, expected_charts=13):
                 return c("ni") / c("rev")
             if h == f"FCF（{U}）":
                 return (c("ocf") + c("capex")) / 1e8
-            if h == "基本加权股数（百万股）":
+            if h == "基本加权股数（亿股）":
                 return ex.shares(per, "b")[0]
             if h == "ROE":
                 return c("ni") / c("eq")
@@ -1810,7 +2055,7 @@ def run_checks(xlsx, ex, ref_mcap=None, expected_charts=13):
         return None
 
     for y, r in drow.items():
-        for h in ["毛利率", "营业利润率", "净利率", f"FCF（{U}）", "基本加权股数（百万股）", "ROE", f"营收（{U}）"]:
+        for h in ["毛利率", "营业利润率", "净利率", f"FCF（{U}）", "基本加权股数（亿股）", "ROE", f"营收（{U}）"]:
             a = indep(y, h)
             if h not in dh:
                 continue
@@ -1827,7 +2072,7 @@ def run_checks(xlsx, ex, ref_mcap=None, expected_charts=13):
 
     # 3 近12季度最新一季 = 导出最新报告期，说明写明期末日
     qs = wb["近12季度明细"]
-    labels = [c.value for c in qs[3][2:] if c.value and str(c.value).startswith("FY")]
+    labels = [c.value for c in qs[3][2:] if c.value and re.fullmatch(r"[1-4]Q\d{2}[AE]", str(c.value))]
     latest = ex.label(ex.quarters[-1]) if ex.quarters else None
     end = ex.meta[ex.quarters[-1]]["end"] if ex.quarters else None
     notes_txt = " ".join(str(c.value) for row in wb["说明"].iter_rows() for c in row if c.value)
@@ -1886,8 +2131,8 @@ def run_checks(xlsx, ex, ref_mcap=None, expected_charts=13):
                 basis["基本加权股数"] += 1
             else:
                 no_basis.append(y)
-        s = val("市值与估值", f"{vh.get('股数（百万股）') or vh['基本加权股数（百万股）']}{r}")
-        if abs(m - p * s / 100) > 1e-9 * abs(m):
+        s = val("市值与估值", f"{vh['股数（亿股）']}{r}")
+        if abs(m - p * s) > 1e-9 * abs(m):
             bad_m.append(y)
         if (e - d).days > 10 or d > e:
             bad_px.append(y)
@@ -1948,6 +2193,174 @@ def run_checks(xlsx, ex, ref_mcap=None, expected_charts=13):
     listed = {sm[f"A{r}"].value: (sm[f"B{r}"].value, sm[f"C{r}"].value) for r in range(1, sm.max_row + 1)}
     missing = [s for s in wb.sheetnames if not (s in listed and listed[s][0] and listed[s][1])]
     add("8 说明写清每张表的口径与缺口", not missing, f"{len(wb.sheetnames)} 张表，缺说明 {missing or '无'}")
+    res += format_checks(xlsx, wb, ev)
+    return res
+
+
+def format_checks(xlsx, wb, ev):
+    """格式规范 Part B 里能程序化读取的项目，逐项比（第 9–12 项）。"""
+    res = []
+    add = lambda name, ok, detail: res.append((name, bool(ok), detail))
+    # 9 工作表设置
+    bad = []
+    nf = wb._named_styles["Normal"].font
+    if (nf.name, nf.sz) != (LATIN_FONT, FONT_PT):
+        bad.append(f"默认字体 {nf.name} {nf.sz}")
+    for ws in wb.worksheets:
+        sv = ws.sheet_view
+        tab = ws.sheet_properties.tabColor
+        if sv.showGridLines is not False:
+            bad.append(f"{ws.title} 网格线")
+        if ws.freeze_panes != "B2":
+            bad.append(f"{ws.title} 冻结 {ws.freeze_panes}")
+        if (sv.zoomScale or 100) != 100:
+            bad.append(f"{ws.title} 缩放")
+        if tab is None or (tab.rgb or "")[-6:] != TAB_COLOR:
+            bad.append(f"{ws.title} 标签色")
+        if any(rg.min_row != 1 or rg.max_row != 1 for rg in ws.merged_cells.ranges):
+            bad.append(f"{ws.title} 合并单元格")
+        max_col = ws.max_column
+        for j in range(1, max_col + 1):
+            cd = ws.column_dimensions.get(get_column_letter(j))
+            px = width_to_px(cd.width) if cd is not None and cd.width else width_to_px(ws.sheet_format.defaultColWidth or 0)
+            if (j == 1 and px != PX_A) or (j > 1 and px not in (PX_COL, PX_LONG)):
+                bad.append(f"{ws.title} {get_column_letter(j)} 列宽 {px} px")
+                break
+        r1 = ws.row_dimensions[1].height
+        if r1 is None or round(r1 / 0.75) != PX_TITLE:
+            bad.append(f"{ws.title} 主标题行高")
+        for r in range(2, ws.max_row + 1):
+            h = ws.row_dimensions[r].height
+            px = round(h / 0.75) if h else None
+            if px is None or (px != PX_ROW and px != PX_HEAD and px % PX_LINE not in (0, 2)):
+                bad.append(f"{ws.title} 第 {r} 行行高 {px}")
+                break
+    add("9 格式·工作表：默认 Arial 10、隐藏网格线、冻结第 1 行与 A 列、缩放 100%、标签色 #17365D、只有主标题行可合并、"
+        "列宽 A 260 / 其余 100 / 长文本 120 px、行高 20 / 28 / 22 px（换行按行数加高）", not bad,
+        f"{len(wb.worksheets)} 张表；不符 {bad[:6] or '无'}")
+    # 10 字体颜色：按单元格内容判定
+    cnt, wrong = defaultdict(int), []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows(min_row=2):
+            for c in row:
+                if c.value is None or c.fill.fgColor.rgb in (f"00{C_HDR}", f"FF{C_HDR}") or \
+                        (c.fill.fgColor.rgb or "")[-6:] in (C_HDR, C_SEC_BG):
+                    continue
+                color = (c.font.color.rgb if c.font and c.font.color is not None else None) or ""
+                if color[-6:] == C_NOTE:
+                    cnt["辅助说明"] += 1
+                    continue
+                kind = formula_kind(c.value, ws.title)
+                if kind == "input" and c.column == 1:
+                    kind = "text"
+                cnt[kind] += 1
+                if color[-6:] != KIND_COLOR[kind]:
+                    wrong.append(f"{ws.title}!{c.coordinate}")
+                font_ok = c.font.name == (CJK_FONT if isinstance(c.value, str) and not c.value.startswith("=")
+                                          and CJK_RE.search(c.value) else LATIN_FONT) and c.font.sz == FONT_PT
+                if not font_ok:
+                    wrong.append(f"{ws.title}!{c.coordinate} 字体")
+    add("10 格式·字体颜色：手输常数蓝 #0000FF、本表公式黑、跨表引用绿 #008000、外部工作簿红 #FF0000；字号 10、中文单元格 Noto Sans SC",
+        not wrong, f"常数 {cnt['input']}、本表公式 {cnt['formula']}、跨表 {cnt['link']}、外部 {cnt['external']}、"
+                   f"文字 {cnt['text']}、辅助说明 {cnt['辅助说明']}；不符 {wrong[:5] or '无'}")
+    # 11 底色与数字格式
+    bad_fill, bad_fmt, nnum = [], [], 0
+    for ws in wb.worksheets:
+        a1 = ws["A1"]
+        if (a1.fill.fgColor.rgb or "")[-6:] != C_TITLE or (a1.font.color.rgb or "")[-6:] != C_WHITE:
+            bad_fill.append(f"{ws.title} 主标题")
+        for row in ws.iter_rows(min_row=2):
+            for c in row:
+                fill = (c.fill.fgColor.rgb or "")[-6:] if c.fill and c.fill.fill_type == "solid" else ""
+                if fill and fill not in (C_HDR, C_SEC_BG, C_BAND, C_TITLE):
+                    bad_fill.append(f"{ws.title}!{c.coordinate} {fill}")
+                if fill == C_HDR and (c.font.color.rgb or "")[-6:] != C_WHITE:
+                    bad_fill.append(f"{ws.title}!{c.coordinate} 列标题字色")
+                if fill == C_SEC_BG and c.value is not None and (c.font.color.rgb or "")[-6:] != C_SEC_FG:
+                    bad_fill.append(f"{ws.title}!{c.coordinate} 分区标题字色")
+                v = c.value
+                numeric = (isinstance(v, (int, float, dt.date)) and not isinstance(v, bool)) or (
+                    isinstance(v, str) and v.startswith("=") and c.number_format != "General")
+                if numeric and fill != C_HDR:
+                    nnum += 1
+                    if c.number_format not in ALLOWED_FMTS:
+                        bad_fmt.append(f"{ws.title}!{c.coordinate} {c.number_format}")
+            first = next((c for c in row if c.value is not None), None)
+            if first is not None and isinstance(first.value, str) and first.value.startswith(("合计", "总计")):
+                if not (first.font.bold and first.border.top.style):
+                    bad_fill.append(f"{ws.title} 合计行 {first.row}")
+    add("11 格式·底色与数字格式：主标题 #17365D 白字、分区 #D9EAF7/#17365D 字、列标题 #1F4E78 白字、隔行 #F7F9FB、"
+        "合计行加粗上边框；金额 #,##0.0、百分比 0.0%、倍数 0.0x、股价 $0.00，负数括号、零值短横线，年度 2024A",
+        not bad_fill and not bad_fmt, f"数值单元格 {nnum}；底色不符 {bad_fill[:4] or '无'}；数字格式不符 {bad_fmt[:4] or '无'}")
+    # 12 图表格式与可读性
+    z = zipfile.ZipFile(xlsx)
+    ns = {"c": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+          "a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
+    C, A = "{%s}" % ns["c"], "{%s}" % ns["a"]
+    parts = sorted((n for n in z.namelist() if re.match(r"xl/charts/chart\d+\.xml$", n)),
+                   key=lambda n: int(re.findall(r"\d+", n)[0]))
+    bad = []
+    for pth in parts:
+        root = ET.fromstring(z.read(pth))
+        tag = pth.rsplit("/", 1)[-1]
+        sp = root.find(f"{C}spPr")
+        if sp is None or sp.find(f"{A}solidFill/{A}srgbClr") is None or \
+                sp.find(f"{A}solidFill/{A}srgbClr").get("val") != "FFFFFF" or sp.find(f"{A}ln/{A}noFill") is None:
+            bad.append(f"{tag} 底色或边框")
+        rc = root.find(f"{C}roundedCorners")
+        if rc is None or rc.get("val") not in ("0", "false"):
+            bad.append(f"{tag} 圆角")
+        chart = root.find(f"{C}chart")
+        pa = chart.find(f"{C}plotArea")
+        if any(e.tag.endswith(("3DChart", "view3D")) for e in pa) or chart.find(f"{C}view3D") is not None:
+            bad.append(f"{tag} 三维")
+        if root.find(f".//{A}effectLst/{A}outerShdw") is not None:
+            bad.append(f"{tag} 阴影")
+        t = chart.find(f"{C}title")
+        rpr = t.find(f".//{A}r/{A}rPr") if t is not None else None
+        ml = t.find(f"{C}layout/{C}manualLayout") if t is not None else None
+        if rpr is None or rpr.get("sz") != "1000" or rpr.get("b") not in ("1", "true") or \
+                rpr.find(f"{A}latin").get("typeface") != LATIN_FONT or ml is None or float(ml.find(f"{C}x").get("val")) > 0.05:
+            bad.append(f"{tag} 标题")
+        lg = chart.find(f"{C}legend")
+        if lg is None or lg.find(f"{C}legendPos").get("val") != "b" or \
+                lg.find(f".//{A}defRPr").get("sz") != "900":
+            bad.append(f"{tag} 图例")
+        for ax in [e for e in pa if e.tag in (f"{C}catAx", f"{C}valAx", f"{C}dateAx")]:
+            if ax.tag == f"{C}dateAx":
+                bad.append(f"{tag} 日期轴")
+            d = ax.find(f".//{A}defRPr")
+            if d is None or d.get("sz") != "900":
+                bad.append(f"{tag} 坐标轴字号")
+            g = ax.find(f"{C}majorGridlines")
+            if g is not None and g.find(f".//{A}srgbClr").get("val") != GRID_COLOR:
+                bad.append(f"{tag} 网格线颜色")
+        sers = pa.findall(f".//{C}ser")
+        if len(sers) > 3:
+            bad.append(f"{tag} {len(sers)} 个系列")
+        for se in sers:
+            clr = se.find(f"{C}spPr//{A}srgbClr")
+            if clr is None or clr.get("val") not in CHART_COLORS:
+                bad.append(f"{tag} 系列颜色")
+        for lc in pa.findall(f"{C}lineChart"):
+            for se in lc.findall(f"{C}ser"):
+                mk = se.find(f"{C}marker/{C}symbol")
+                sm = se.find(f"{C}smooth")
+                if mk is None or mk.get("val") != "none" or (sm is not None and sm.get("val") not in ("0", "false")):
+                    bad.append(f"{tag} 折线标记点或平滑")
+        for se in sers:
+            cat = se.find(f"{C}cat")
+            if cat is None or cat.find(f"{C}strRef") is None:
+                bad.append(f"{tag} 横轴不是文本类别")
+                break
+            f = cat.find(f"{C}strRef/{C}f").text
+            vals = _ref_values(ev, f)
+            if any(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vals):
+                bad.append(f"{tag} 横轴标签是数值")
+                break
+    add("12 格式·图表：白底无边框无阴影无三维、标题 Arial 10 加粗左对齐、坐标轴与图例 9 pt、图例底部、网格线 #D9D9D9、"
+        "系列色板；可读性：≤ 3 个系列、文本类别横轴、折线无标记点", not bad and parts,
+        f"图表 {len(parts)} 张；不符 {sorted(set(bad))[:6] or '无'}")
     return res
 
 
@@ -1981,8 +2394,8 @@ def print_checks(res, code):
 PNG_NAMES = {1: "营收与增速", 2: "分部结构", 3: "利润率带", 4: "现金流去向", 5: "资本开支与经营现金流",
              6: "股数与回购", 7: "市值与营收", 8: "估值倍数带", 9: "近12季营收与增速", 10: "近12季利润率",
              11: "股价与事件", 12: "市值对比参考公司", 13: "同行横向比较"}
-# 低饱和、色盲友好的固定配色（Tableau 10 前段），不用彩虹色
-PNG_COLORS = ["#4E79A7", "#F28E2B", "#59A14F", "#E15759", "#76B7B2", "#B07AA1", "#9C755F", "#BAB0AC"]
+# 与原生图表同一色板（格式规范第 7 节）：主要 #17365D、次要 #5B9BD5、对照 #A6A6A6
+PNG_COLORS = ["#" + c for c in CHART_COLORS]
 LAYER2_PREFIX = ("分部", "参考公司")  # 第二层系列：这些全空时整张图视为无数据
 PNG_RE = re.compile(r"^图\d{2}_.+\.png$")
 
@@ -2074,6 +2487,14 @@ def png_name(num):
     return f"图{num:02d}_{PNG_NAMES.get(num, f'图表{num}')}.png"
 
 
+def _pick_latin_font(fm):
+    names = {f.name for f in fm.fontManager.ttflist}
+    for want in ("Arial", "Liberation Sans", "Arimo"):  # 后两个与 Arial 字宽相同
+        if want in names:
+            return want
+    return None
+
+
 def _pick_cjk_font(fm):
     names = {f.name for f in fm.fontManager.ttflist}
     for want in ("Noto Sans CJK SC", "Noto Sans SC"):
@@ -2099,13 +2520,14 @@ def export_png(xlsx, outdir, code=""):
     except ImportError:
         print("未装 matplotlib，跳过 PNG 导出（python3 -m pip install --user matplotlib）")
         return None
-    font = _pick_cjk_font(fm)
-    if font:
-        plt.rcParams["font.family"] = [font, "DejaVu Sans"]
-    else:
-        plt.rcParams["font.family"] = ["DejaVu Sans"]
+    font, latin = _pick_cjk_font(fm), _pick_latin_font(fm)
+    plt.rcParams["font.family"] = [x for x in (latin, font) if x] + ["DejaVu Sans"]
+    if not font:
         print("警告：没找到 Noto Sans CJK / Noto Sans SC / WenQuanYi 中文字体，退回 DejaVu Sans，图中中文可能显示为方框")
+    if not latin:
+        print("提醒：没找到 Arial（或字宽相同的 Liberation Sans / Arimo），西文数字用 DejaVu Sans")
     plt.rcParams["axes.unicode_minus"] = False
+    plt.rcParams["figure.facecolor"] = plt.rcParams["axes.facecolor"] = plt.rcParams["savefig.facecolor"] = "white"
     os.makedirs(outdir, exist_ok=True)
     wb = openpyxl.load_workbook(xlsx)
     written = []
@@ -2170,34 +2592,42 @@ def export_png(xlsx, outdir, code=""):
                             jb += 1
                     else:
                         h, = a.plot(xs, [v if v is not None else float("nan") for v in ys], color=c,
-                                    linewidth=1.6, marker="o", markersize=2.5, label=s["name"])
+                                    linewidth=1.6, label=s["name"])  # 折线无标记点
                     handles.append(h)
+                if g["log"]:
+                    a.set_yscale("log")
                 if not g["secondary"]:
-                    a.set_xticks(xs)
-                    a.set_xticklabels(lab, rotation=45 if len(lab) > 12 else 0,
-                                      ha="right" if len(lab) > 12 else "center", fontsize=7)
+                    step = max(1, -(-len(lab) // 12))  # 标签多时隔几个标一个，最多约 12 个
+                    a.set_xticks(xs[::step])
+                    a.set_xticklabels(lab[::step], rotation=45 if len(lab[::step]) > 8 else 0,
+                                      ha="right" if len(lab[::step]) > 8 else "center", fontsize=9)
             if g["pct"]:
-                a.yaxis.set_major_formatter(PercentFormatter(1.0, decimals=None))
+                a.yaxis.set_major_formatter(PercentFormatter(1.0, decimals=0))
             else:
                 plain = FuncFormatter(lambda v, _: f"{v:,.0f}" if abs(v - round(v)) < 1e-9 else f"{v:,.1f}")
                 a.yaxis.set_major_formatter(plain)
                 if g["log"]:
                     a.yaxis.set_minor_formatter(plain)
             if g["ytitle"]:
-                a.set_ylabel(g["ytitle"], fontsize=8)
-            a.tick_params(which="both", labelsize=7)
+                a.set_ylabel(g["ytitle"], fontsize=9)
+            a.tick_params(which="both", labelsize=9)
         if any(g["kind"] == "barChart" for g in sp["groups"]):
-            ax.axhline(0, color="#999999", linewidth=0.6)
-        ax.set_title(f"图 {sp['num']}  {sp['title']}" + (f"｜{code}" if code else ""), fontsize=10, loc="left")
+            ax.axhline(0, color="#A6A6A6", linewidth=0.6)
+        ax.set_title(f"图 {sp['num']}  {sp['title']}" + (f"｜{code}" if code else ""), fontsize=10, loc="left",
+                     fontweight="bold")
         for a in (ax, ax2):
             if a is not None:
                 for side in ("top",) + (() if a is ax2 else ("right",)):
                     a.spines[side].set_visible(False)
-        ax.grid(axis="y", color="#E5E5E5", linewidth=0.6)
+        # 网格线 #D9D9D9 放在柱子和折线后面：主轴 set_axisbelow；副轴的线画在主轴之上，也不会被网格线压住
         ax.set_axisbelow(True)
+        ax.grid(axis="y", which="major", color="#D9D9D9", linewidth=0.6, zorder=0)
+        if ax2 is not None:
+            ax2.set_axisbelow(True)
+            ax2.grid(False)
         if handles:
-            ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=min(len(handles), 4),
-                      fontsize=7, frameon=False)
+            ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=min(len(handles), 3),
+                      fontsize=9, frameon=False)
         fig.tight_layout()
         p = os.path.join(outdir, png_name(sp["num"]))
         fig.savefig(p)
@@ -2212,7 +2642,7 @@ def check_png(xlsx, outdir):
     want = sorted(png_name(sp["num"]) for sp in chart_specs(wb) if spec_has_data(sp))
     have = sorted(f for f in (os.listdir(outdir) if os.path.isdir(outdir) else []) if PNG_RE.match(f))
     ok = len(have) == len(want) and set(have) == set(want)
-    return ("9 PNG 快照数量 = 有数据的图数量", ok,
+    return ("13 PNG 快照数量 = 有数据的图数量", ok,
             f"有数据的图 {len(want)} 张，{outdir} 里 PNG {len(have)} 张；缺 {sorted(set(want) - set(have)) or '无'}，"
             f"多出 {sorted(set(have) - set(want)) or '无'}")
 
@@ -2264,7 +2694,7 @@ def main(argv=None):
         if export_png(path, a.png, code) is not None:
             png_dir = a.png
         else:
-            print("PNG 未导出，--check 不做第 9 项")
+            print("PNG 未导出，--check 不做第 13 项")
     if a.check or a.check_only:
         res = run_checks(path, ex, ref, nchart)
         if png_dir:
