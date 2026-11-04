@@ -4,8 +4,10 @@
 #   2) 研报库索引 / 检索 / 阅读准备（含日期误判等回归测试）
 #   3) xlsx 修改流程：保留图表、公式、隐藏表；强制重算标记
 #   4) LibreOffice 重算（未安装时明确报告为"跳过"）
-#   5) 历史数据 Excel 脚本：用虚构公司 ACME 的最小长表生成工作簿并跑 --check；--png 导出图表快照
-#   6) md2docx.py：示例 .md（标题、表格、现场生成的占位 PNG、图注）转 .docx 后读回检查
+#   5) 历史数据 Excel 脚本：用虚构公司 ACME 的最小长表生成工作簿并跑 --check（含格式规范 Part B 第 9–12 项）；
+#      --png 导出图表快照
+#   6) md2docx.py：示例 .md（摘要、目录、编号问题、单位表头、合计行、现场生成的占位 PNG、注释、附录）转 .docx，
+#      检查输出（含标题编号与格式规范 Part A 格式检查）并读回核对
 # 用法：bash tests/run_tests.sh   （在仓库根目录运行）
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -98,10 +100,11 @@ echo "== 5. 历史数据 Excel 脚本 =="
 python3 tests/make_history_fixture.py "$TMP/futu" >/dev/null
 python3 research-sop/scripts/build_history_xlsx.py ACME --root "$TMP/futu" --out "$TMP/hist" --ai 测试 --check \
   | tee "$TMP/hist.txt"
-grep -q "结果：8/8 通过" "$TMP/hist.txt"
+grep -q "结果：12/12 通过" "$TMP/hist.txt"
 grep -q "股数口径：基本加权股数 5 年、期末股数 1 年" "$TMP/hist.txt"
 python3 - "$TMP/hist" <<'EOF'
 import glob, sys, zipfile, openpyxl
+sys.path.insert(0, "research-sop/scripts")
 p = glob.glob(sys.argv[1] + "/*_ACME_历史数据_v1_测试.xlsx")
 assert len(p) == 1, p
 wb = openpyxl.load_workbook(p[0])
@@ -110,7 +113,7 @@ for s in ["图表总览", "说明", "历年营收与业务拆分", "年度三表
           "缺口", "来源", "图表计算"]:
     assert s in wb.sheetnames, f"缺工作表 {s}"
 q = [c.value for c in wb["近12季度明细"][3][2:14]]
-assert q[-1] == "FY2025Q2" and q[0] == "FY2022Q3", q
+assert q[-1] == "2Q25A" and q[0] == "3Q22A", q
 assert str(wb["年度衍生指标"]["E5"].value).startswith("=IF(COUNT("), "衍生指标应为公式"
 ev = [r for r in wb["股价事件"].iter_rows(min_row=5, values_only=True) if r[1] == "单日"]
 assert len(ev) == 1 and str(ev[0][0])[:10] == "2023-03-15", ev
@@ -121,14 +124,42 @@ row = {vs.cell(r, 1).value: r for r in range(5, vs.max_row + 1) if isinstance(vs
 basis = {y: vs.cell(r, h["股数口径"]).value for y, r in row.items()}
 assert basis[2024] == "期末股数（资产负债表·普通股股数）", basis
 assert basis[2023] == basis[2022] == "基本加权股数（推算）", basis
-assert abs(vs.cell(row[2024], h["股数（百万股）"]).value - 1020) < 1e-6
+assert abs(vs.cell(row[2024], h["股数（亿股）"]).value - 10.2) < 1e-9, "股数单位应为亿股"
 assert "未采用" in str(vs.cell(row[2023], h["备注"]).value), "量级不对的期末股数应注明未采用"
-print("历史数据 Excel：17 张表、13 张图、近 12 季、股价事件、公式、市值股数口径均正确")
+mc = vs.cell(row[2024], h["市值（亿美元）"]).value
+assert mc.endswith("*" + vs.cell(row[2024], h["股数（亿股）"]).coordinate + ',""))'), f"市值 = 价 × 亿股，不再 ÷ 100：{mc}"
+# 格式规范 Part B（抽查；--check 第 9–12 项逐格比过）
+B = __import__("build_history_xlsx")
+nf = wb._named_styles["Normal"].font
+assert (nf.name, nf.sz) == ("Arial", 10), nf
+for ws in wb.worksheets:
+    assert ws.sheet_view.showGridLines is False and ws.freeze_panes == "B2", ws.title
+    assert ws.sheet_properties.tabColor.rgb.endswith("17365D"), ws.title
+    assert B.width_to_px(ws.column_dimensions["A"].width) == 260, ws.title
+    assert round(ws.row_dimensions[1].height / 0.75) == 28, ws.title
+    assert ws["A1"].fill.fgColor.rgb.endswith("17365D") and ws["A1"].font.color.rgb.endswith("FFFFFF"), ws.title
+    assert not [r for r in ws.merged_cells.ranges if r.min_row != 1], ws.title
+hc = vs.cell(4, h["年度"])
+assert hc.fill.fgColor.rgb.endswith("1F4E78") and hc.font.color.rgb.endswith("FFFFFF") and hc.font.bold
+r = row[2024]
+assert vs.cell(r, h["财年期末日"]).font.color.rgb.endswith("0000FF"), "手输常数应为蓝色"
+assert vs.cell(r, h["市值（亿美元）"]).font.color.rgb.endswith("000000"), "本表公式应为黑色"
+assert vs.cell(r, h["总债务（亿美元）"]).font.color.rgb.endswith("008000"), "跨表引用应为绿色"
+assert vs.cell(r, 1).number_format == '0"A"' and vs.cell(r, 1).value == 2024, "年度显示 2024A、数值不变"
+assert vs.cell(r, h["市值（亿美元）"]).number_format == '#,##0.0;(#,##0.0);"-"'
+assert vs.cell(r, h["收盘价（美元）"]).number_format == '$#,##0.00;($#,##0.00);"-"'
+assert vs.cell(r, h["P/E"]).number_format == '0.0"x";(0.0"x");"-"'
+assert wb["年度三表"]["A5"].fill.fgColor.rgb.endswith("D9EAF7"), "分区标题底色"
+band = {vs.cell(rr, 2).fill.fgColor.rgb[-6:] for rr in row.values() if vs.cell(rr, 2).fill.fill_type == "solid"}
+assert band == {"F7F9FB"}, band
+xml = zipfile.ZipFile(p[0]).read("xl/charts/chart1.xml").decode()
+assert "17365D" in xml and "5B9BD5" in xml and "D9D9D9" in xml and 'sz="1000"' in xml and "strRef" in xml
+print("历史数据 Excel：17 张表、13 张图、近 12 季（2Q25A）、股价事件、公式、亿股与市值、Part B 格式抽查均正确")
 EOF
 if python3 -c "import matplotlib" 2>/dev/null; then
   python3 research-sop/scripts/build_history_xlsx.py ACME --root "$TMP/futu" --check-only "$TMP"/hist/*_ACME_历史数据_v1_测试.xlsx \
     --png "$TMP/png" | tee "$TMP/png.txt"
-  grep -q "结果：9/9 通过" "$TMP/png.txt"
+  grep -q "结果：13/13 通过" "$TMP/png.txt"
   grep -q "跳过：图 2 无数据" "$TMP/png.txt"
   python3 - "$TMP/png" <<'EOF'
 import os, sys
@@ -148,8 +179,14 @@ python3 -c "import docx" 2>/dev/null || pip install -q python-docx --break-syste
 mkdir -p "$TMP/md/fig"
 cp tests/fixtures/md2docx_sample.md "$TMP/md/"
 python3 -c "from PIL import Image; Image.new('RGB', (1600, 800), (78, 121, 167)).save('$TMP/md/fig/图01_营收与增速.png', dpi=(200, 200))"
-python3 research-sop/scripts/md2docx.py "$TMP/md/md2docx_sample.md" --out "$TMP/md/out.docx" | tee "$TMP/md.txt"
-grep -q "标题 6（一级 1 / 二级 3 / 三级 2）；表格 2；图片 1" "$TMP/md.txt"
+python3 research-sop/scripts/md2docx.py "$TMP/md/md2docx_sample.md" --out "$TMP/md/out.docx" --date 2026-11-04 \
+  | tee "$TMP/md.txt"
+grep -q "标题 9（报告标题 1 / 一级 5 / 二级 2 / 三级 1）；表格 2；图片 1" "$TMP/md.txt"
+grep -q "页眉：ACME 公司档案（测试样例） ⇥ ACME · 2026-11-04" "$TMP/md.txt"
+grep -q "标题编号（只检查不改写）：正文一级 2、二级 2、三级 1；问题 2 处" "$TMP/md.txt"
+grep -q "「1.2 同行比较」：编号与标题之间缺全角空格" "$TMP/md.txt"
+grep -q "「三、未来：利好与利空」：跳号或错号，应为「二、」" "$TMP/md.txt"
+grep -q "格式检查（格式规范 Part A，读回 .docx 逐项比）：10/10 通过" "$TMP/md.txt"
 if python3 research-sop/scripts/md2docx.py "$TMP/md/md2docx_sample.md" --check-only --img-root "$TMP/nowhere" \
     >/dev/null 2>"$TMP/md_err.txt"; then
   echo "缺图时应以非零码退出"; exit 1
@@ -159,23 +196,44 @@ python3 - "$TMP/md/out.docx" <<'EOF'
 import sys
 import docx
 from docx.oxml.ns import qn
+import os
 d = docx.Document(sys.argv[1])
-heads = [p for p in d.paragraphs if p.style.name.startswith("Heading")]
-assert len(heads) == 6, [p.text for p in heads]
+assert os.path.getsize(sys.argv[1]) < 30 * 1024, "瘦身后应在 30 KB 以内（MCP 上传按 base64 走）"
+st = lambda name: [p for p in d.paragraphs if p.style.name == name]
+assert [p.text for p in st("Title")] == ["ACME 公司档案（测试样例）"]
+assert [p.text for p in st("独立标题")] == ["一页摘要", "目录"]
+assert len(st("Heading 1")) == 4 and len(st("Heading 2")) == 2 and len(st("Heading 3")) == 1
+assert [p.text for p in d.paragraphs if p.paragraph_format.page_break_before] == \
+    ["目录", "一、财务全史", "三、未来：利好与利空", "附一、本报告的取舍", "附二、来源"]
+sec = d.sections[0]
+assert (sec.page_width.twips, sec.page_height.twips) == (11906, 16838) and sec.left_margin.twips == 1134
+assert "ACME · 2026-11-04" in sec.header.paragraphs[0].text and "NUMPAGES" in sec.footer._element.xml
+assert 'TOC \\o "1-2"' in d.element.body.xml
 assert len(d.tables) == 2 and d.tables[0].style.name == "Table Grid"
-assert len(d.tables[0].rows) == 4 and len(d.tables[0].columns) == 4
-assert all(r.bold for r in d.tables[0].rows[0].cells[0].paragraphs[0].runs), "表头应加粗"
+t = d.tables[0]
+assert len(t.rows) == 5 and len(t.columns) == 5
+hc = t.rows[0].cells[1]
+assert hc._tc.tcPr.find(qn("w:shd")).get(qn("w:fill")) == "17365D"
+runs = [r for r in hc.paragraphs[0].runs if r.text.strip()]
+assert [r.text for r in runs] == ["营收", "（亿美元）"] and runs[1].font.size.pt == 9 and runs[1].bold is False
+assert t.rows[1].cells[1].paragraphs[0].alignment == 1 and t.rows[1].cells[3].paragraphs[0].alignment == 0, "数值居中、文本左对齐"
+assert all(r.bold for r in t.rows[4].cells[0].paragraphs[0].runs) and t.rows[4].cells[0]._tc.tcPr.find(qn("w:tcBorders")) is not None
+assert sum(int(g.get(qn("w:w"))) for g in t._tbl.tblGrid.findall(qn("w:gridCol"))) == 9638
+widths = [int(g.get(qn("w:w"))) for g in t._tbl.tblGrid.findall(qn("w:gridCol"))]
+assert widths[3] == max(widths), f"叙述列应吃剩余宽度：{widths}"
 assert len(d.inline_shapes) == 1 and d.inline_shapes[0].width <= 15 * 360000
 normal = d.styles["Normal"]
 rf = normal.element.rPr.rFonts
-assert normal.font.name == "Noto Sans SC" and rf.get(qn("w:eastAsia")) == "Noto Sans SC", "正文字体应为 Noto Sans SC（含东亚）"
-assert normal.font.size.pt == 10.5
+assert rf.get(qn("w:ascii")) == "Arial" and rf.get(qn("w:eastAsia")) == "Noto Sans SC", "西文 Arial、中文 Noto Sans SC 分设"
+assert normal.font.size.pt == 10.5 and normal.paragraph_format.line_spacing == 1.25
+assert [d.styles[f"Heading {k}"].font.size.pt for k in (1, 2, 3)] == [18, 14, 12]
 notes = [p for p in d.paragraphs if p.style.name == "注释小字"]
-assert {p.text.split("：")[0] for p in notes} >= {"表注", "数据与可编辑图表", "来源"}, [p.text for p in notes]
-assert d.styles["注释小字"].font.size.pt == 9
+assert {p.text.split("：")[0] for p in notes} >= {"表注", "数据与可编辑图表", "来源", "口径说明"}, [p.text for p in notes]
+assert d.styles["注释小字"].font.size.pt == 9 and str(d.styles["注释小字"].font.color.rgb) == "666666"
+assert [p.text for p in st("表题")] == ["表 1 全史总表：营收与毛利率"]
 body = "\n".join(p.text for p in d.paragraphs)
 assert "[R01234 p5]" in body and "**" not in body
-print("md2docx：6 个标题、2 张真表格（表头加粗）、1 张图（≤ 15 cm）、正文 Noto Sans SC 10.5 pt、注释 9 pt、缺图报错均正确")
+print("md2docx：A4 页面、页眉页脚、摘要→目录→正文分页、标题层级与字号、单位表头、合计行、列宽、注释、表题、缺图报错均正确")
 EOF
 
 echo
