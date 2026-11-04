@@ -13,6 +13,7 @@
 #      取舍 / 来源 / 修订说明在正文）逐项报出
 #   7) check_delivery.py：用 rclone lsjson 样例 JSON（tests/fixtures/check_delivery_*.json）离线核对 Drive 布局、
 #      命名、格式，并核对本地 成品/、留痕/复用、复核；不联网
+#   8) research-prompt：SKILL.md 有 frontmatter name，任务书模板与模板库文件齐，SKILL.md 与任务书模板不含题型内容
 # 用法：bash tests/run_tests.sh   （在仓库根目录运行）
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -356,6 +357,17 @@ if grep -q "共用数据/ 缺\|ACME_底稿说明_20261105" "$TMP/cd_bad.txt"; th
 if grep -q "来源清单.xlsx" "$TMP/cd_bad.txt"; then echo "无元数据、Size -1 的 .xlsx 应认作 Google 表格"; exit 1; fi
 if grep -q "10-K_2025.pdf\|IR页面存档" "$TMP/cd_good.txt"; then echo "来源/ 里的原件应原样放行"; exit 1; fi
 echo "check_delivery：合规样例（含底稿说明、共用数据/）14/14 通过；不合规样例逐项报出命名、原件、自创文件夹、底稿/ 根下散文件、缺件（含 共用数据/ 之外的文件夹）、格式（含 共用数据/）、PNG 位置、raw、本地缺 复核/ 与数字台账，退出码 1"
+
+echo "== 8. research-prompt =="
+grep -q "^name: research-prompt$" research-prompt/SKILL.md
+for f in research-prompt/templates/任务书模板.md research-prompt/模板库/README.md research-prompt/模板库/参考骨架.md \
+    research-prompt/模板库/周期全景_半导体周期_20261104.md; do
+  test -s "$f" || { echo "缺文件：$f"; exit 1; }
+done
+if grep -n "半导体\|周期" research-prompt/SKILL.md research-prompt/templates/任务书模板.md; then
+  echo "research-prompt 的 SKILL.md 与任务书模板不得写题型内容（周期内容只放模板库）"; exit 1
+fi
+echo "research-prompt：frontmatter、任务书模板与模板库文件齐，SKILL.md 与任务书模板无题型内容"
 
 echo
 if [ ${#SKIPPED[@]} -gt 0 ]; then
