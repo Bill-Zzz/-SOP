@@ -4,6 +4,7 @@
 用法：
   python3 check_delivery.py --drive "gdrive:百万美金研究库/10_工作区/YYYYMMDD_任务名" [--local 本地任务文件夹]
   python3 check_delivery.py --lsjson 已保存的lsjson.json [--local 本地任务文件夹]     离线核对（测试用）
+  第 12 项（目录页码）可另加：--report 报告名（可多次） --toc-text 导出文本目录 --toc-evidence 人工确认文件
 
 读 Drive：调用 `rclone lsjson -R -M <路径>`（-M 读出 Drive 的真实类型 content-type；rclone 版本不支持 -M 时自动去掉重试）。
 rclone 把 Google 文档、表格显示成带 .docx / .xlsx 后缀、Size 为 -1 的文件：本脚本按 content-type 判断，没有元数据时
@@ -23,6 +24,13 @@ Drive 检查项（布局见 Drive 入口文件；命名按 standards/存储规�
   9  PNG 只在 底稿/图片/ 下
   10 底稿/图片/ 下按篇分子文件夹，名字与 底稿/<篇>/ 对应
   11 没有 raw 文件夹（raw 不上传，只在来源清单记路径）
+  12 Google 文档目录：二级条目必须有页码（硬性；格式规范第 5 节"一级无页码、二级 标题　…　页码"）。
+     取文本：--drive 时对每份报告 `rclone cat "<路径>/<文档名>.txt" --drive-export-formats txt`；离线用 --toc-text。
+     在文本里找"目录"一行，往下读目录条目，到正文重新出现第一个条目为止；形如"1.1 标题"的二级条目，
+     行末须是页码（"标题　…　12""标题\\t12""标题 12"），任一条没有即不通过；找不到目录段、目录没有条目也不通过。
+     取不到某份报告的文本时，必须由 --toc-evidence 给出人工确认（每行：文档名｜二级目录带页码：是｜YYYY-MM-DD｜确认人），
+     缺文件、缺这一行、写"否"、格式不对都不通过——不默认通过。取到了文本就以文本为准，人工证据不能推翻文本结果。
+     默认核对根目录全部 Google 文档；同一任务文件夹里有旧版本或非报告文档时，用 --report 指定本次交付的报告（可多次）。
 
 本地检查项（给了 --local 才做；本地任务文件夹里 成品/ 可在根目录，也可在每篇子文件夹里）：
   L1 有 成品/，里面有报告（.md 或 .docx）
@@ -57,6 +65,14 @@ DOC_KEYS = ("结论卡", "自检", "复核记录", "数据缺口")
 SHEET_KEYS = ("来源清单", "数字台账", "研报摘要卡", "历史节点", "股价事件", "台账", "处理后数据")
 REQUIRED = ("结论卡", "自检", "来源清单", "数字台账")
 TRAIL, PICS, SOURCES, SHARED, NOTE = "底稿", "图片", "来源", "共用数据", "底稿说明"
+# 目录检查（第 12 项）
+TOC_TITLE = "目录"
+TOC_L1_RE = re.compile(r"^(?:[一二三四五六七八九十]+、|附[一二三四五六七八九十]*[：:、]|附录|一页摘要)")
+TOC_L2_RE = re.compile(r"^\d+\.\d+[\s　]")
+TOC_PAGE_RE = re.compile(r"(?:[\t　…]|\.{2,}|\s)\s*\d{1,4}$")
+TOC_TAIL_RE = re.compile(r"[\s　….]*\d{0,4}$")
+TOC_CLAIM = "二级目录带页码：是"
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 class Item:
@@ -197,6 +213,114 @@ def check_drive(items):
     return res
 
 
+def _toc_key(line):
+    """目录条目去掉行末分隔符与页码后的标题，用来认出正文重新出现的第一个条目。"""
+    return TOC_TAIL_RE.sub("", line).strip()
+
+
+def parse_toc(text):
+    """返回 (目录条目列表, None)；找不到目录段时返回 (None, 原因)。"""
+    lines = [ln.replace("﻿", "").strip() for ln in text.replace("\r", "\n").split("\n")]
+    lines = [ln for ln in lines if ln]
+    start = next((k for k, ln in enumerate(lines) if ln == TOC_TITLE), None)
+    if start is None:
+        return None, "找不到“目录”一行"
+    entries = []
+    for ln in lines[start + 1:]:
+        is_entry = (TOC_L1_RE.match(ln) or TOC_L2_RE.match(ln) or "…" in ln or re.search(r"\t\d{1,4}$", ln))
+        if not is_entry or (entries and _toc_key(ln) == _toc_key(entries[0])) or len(entries) >= 400:
+            break  # 正文从第一个目录条目的标题重新开始，或已不像目录条目
+        entries.append(ln)
+    if not entries:
+        return None, "“目录”下面没有条目"
+    return entries, None
+
+
+def toc_problems(text):
+    """一份文档的目录问题列表；空列表 = 通过。"""
+    entries, why = parse_toc(text)
+    if why:
+        return [why]
+    l2 = [e for e in entries if TOC_L2_RE.match(e)]
+    miss = [e for e in l2 if not TOC_PAGE_RE.search(e)]
+    if miss:
+        return [f"二级条目无页码 {len(miss)}/{len(l2)} 条，首条「{miss[0]}」——按转换后修补清单 D1 补页码后重跑"]
+    return []
+
+
+def load_toc_evidence(path):
+    """人工确认证据：每行 文档名｜二级目录带页码：是｜YYYY-MM-DD｜确认人。返回 {文档名: 问题或 None}，文件问题放在 '' 键。"""
+    if not path:
+        return {}
+    if not os.path.isfile(path):
+        return {"": f"--toc-evidence 文件不存在：{path}"}
+    out = {}
+    with open(path, encoding="utf8") as f:
+        for ln in f:
+            ln = ln.strip()
+            if not ln or ln.startswith("#"):
+                continue
+            parts = [p.strip() for p in re.split(r"[｜|]", ln)]
+            if len(parts) < 4 or not parts[0]:
+                out.setdefault(parts[0] if parts else "", "证据行格式不对（文档名｜二级目录带页码：是｜日期｜确认人）")
+                continue
+            name, claim, date, who = parts[:4]
+            if claim.replace(" ", "").replace(":", "：") != TOC_CLAIM:
+                out[name] = f"人工确认写的是「{claim}」，不是「{TOC_CLAIM}」"
+            elif not DATE_RE.match(date):
+                out[name] = f"人工确认的日期「{date}」不是 YYYY-MM-DD"
+            elif not who:
+                out[name] = "人工确认缺确认人"
+            else:
+                out[name] = None
+    return out
+
+
+def export_doc_text(drive, item):
+    """用 rclone 把 Drive 上的 Google 文档导出成纯文本；失败返回 None。"""
+    path = "/".join(item.parts[:-1] + [item.name + ".txt"])
+    try:
+        r = subprocess.run(["rclone", "cat", f"{drive.rstrip('/')}/{path}", "--drive-export-formats", "txt"],
+                           capture_output=True, text=True)
+    except FileNotFoundError:
+        return None
+    return r.stdout if r.returncode == 0 and r.stdout.strip() else None
+
+
+def check_toc(items, args):
+    """第 12 项：Google 文档目录二级条目必须有页码。缺文本又缺人工证据 = 不通过。"""
+    docs = [i for i in items if len(i.parts) == 1 and not i.is_dir and i.kind == GDOC]
+    bad = []
+    if args.report:
+        names = {d.name for d in docs}
+        bad += [f"--report 指定的「{r}」不在根目录的 Google 文档里" for r in args.report if r not in names]
+        docs = [d for d in docs if d.name in args.report]
+    if not docs:
+        bad.append("没有要核对目录的 Google 文档")
+    evidence = load_toc_evidence(args.toc_evidence)
+    if "" in evidence and evidence[""]:
+        bad.append(evidence[""])
+    for d in docs:
+        text = None
+        if args.toc_text:
+            p = os.path.join(args.toc_text, d.name + ".txt")
+            if os.path.isfile(p):
+                with open(p, encoding="utf8") as f:
+                    text = f.read()
+        elif args.drive:
+            text = export_doc_text(args.drive, d)
+        if text is not None:
+            bad += [f"{d.name}：{x}" for x in toc_problems(text)]
+            continue
+        if not args.toc_evidence:
+            bad.append(f"{d.name}：取不到文档文本，也没有 --toc-evidence 人工确认（缺证据不通过）")
+        elif d.name not in evidence:
+            bad.append(f"{d.name}：取不到文档文本，--toc-evidence 里没有这份文档的确认行（缺证据不通过）")
+        elif evidence[d.name]:
+            bad.append(f"{d.name}：{evidence[d.name]}")
+    return [("Google 文档目录：二级条目必须有页码（硬性）", bad, f"{len(docs)} 份")]
+
+
 def _has(dirpath, key):
     for _, _, fs in os.walk(dirpath):
         if any(key in f for f in fs):
@@ -266,11 +390,17 @@ def main(argv=None):
     src.add_argument("--drive", help='rclone 路径，如 "gdrive:百万美金研究库/10_工作区/20261104_任务名"')
     src.add_argument("--lsjson", help="离线：读已保存的 rclone lsjson -R -M 输出（JSON 文件）")
     ap.add_argument("--local", help="本地任务文件夹（可选）：另查 成品/ 与 留痕/复用、复核 是否齐")
+    ap.add_argument("--report", action="append", default=[],
+                    help="第 12 项只核对这份报告（根目录 Google 文档名，不带后缀；可多次）；不给则核对根目录全部 Google 文档")
+    ap.add_argument("--toc-text", help="第 12 项离线：读这个目录里的 <文档名>.txt（Google 文档导出的纯文本）")
+    ap.add_argument("--toc-evidence",
+                    help="第 12 项人工确认证据文件：每行 文档名｜二级目录带页码：是｜YYYY-MM-DD｜确认人；"
+                         "只在取不到文档文本时采用，缺证据即不通过")
     args = ap.parse_args(argv)
 
     items = load_items(args)
     print(f"交付核对：{args.drive or args.lsjson}（{sum(not i.is_dir for i in items)} 个文件）")
-    groups = [("Drive", check_drive(items))]
+    groups = [("Drive", check_drive(items) + check_toc(items, args))]
     if args.local:
         groups.append((f"本地 {args.local}", check_local(args.local)))
     n = ok = 0
