@@ -2,6 +2,23 @@
 
 版本号规则：大版本.小版本.修订。流程或产出结构变化升小版本；脚本修复、陷阱补充升修订号；不兼容的重构升大版本。
 
+## 0.17.0 — 2026-11-05：中文、英文与数字统一 Noto Sans SC
+起因：Bill 检查《半导体周期》V4.2，发现同一段内、段与段之间行距不齐。查明根因（留痕 `V4.2_行距不一致根因_20261105.md`）：段落设置完全相同，差别在字体——格式规范 V1.41 中文 Arial、英文与数字 Noto Sans SC 分设；Google 文档的单倍行距按每行自然行高最大的字体计算，Arial 没有中文字形，中文由 Arial Unicode MS / MS PGothic 替代显示，行高小，一行里只要出现数字或英文就被 Noto Sans SC 撑高。导出 PDF 实测 10.5 pt 正文纯中文行间距 12.07 pt、含数字行 19.77 pt；全文 137 个多行文本块里 52 个同块行距不齐。Bill 决定（方案 1）：正文、表格、标题的中文与英文、数字统一 Noto Sans SC。
+### 一、格式规范（`standards/格式规范.md`）
+1. G01 中文统一 Noto Sans SC；G03 中英混排不再按字符类别分设；字体表（中文正文、一二三级标题、表头、表体、表格来源）统一 Noto Sans SC；B02、F02、F07、F08（body_font_mode 由 zh_latin_split 改为 unified）、F10、F11 同步；目录固定显示参数与 Part B 工作表的中文字体改为 Noto Sans SC；第 15 节检查矩阵改为检查有无残留分设字体。
+2. 第 3 节加"为什么统一"一段，写明行高机制与 V4.2 实测数字；文首改动说明加第 ⑦ 条；第 16 节修订记录加 0.17.0 一条，V1.28、V1.40、V1.41 历史记录保留。字号、字重、颜色、行距不变。
+### 二、转换后修补清单
+1. 文首写明 0.17.0 起统一 Noto Sans SC 及原因。
+2. D2 改为：行高随字体整体变大不修，但同一段内行距不齐要修；交付前在 Google 导出的 PDF 上抽查中英混排正文与表格，同类行基线间距应一致，不一致说明残留分设字体，按 D3 统一后复核。
+3. D3 改为：插入文字后统一设 Noto Sans SC；旧版脚本生成、已转换的文档把正文、表格、标题、目录、页眉页脚全部文字改为 Noto Sans SC，字号、加粗、颜色不动。S1 图表 fontName 改为 Noto Sans SC；"脚本有意的取舍"中文 run 显式字体一条同步。
+### 三、脚本
+1. `md2docx.py`：中文字体常量 `CJK_FONT` 由 Arial 改为 Noto Sans SC，样式层 rFonts 的 ascii/hAnsi/eastAsia 都是 Noto Sans SC，中文段仍在 run 上显式写字体（防 Google 转换回退日文字体）；格式检查"正文字体"一项改为检查统一字体；说明文字同步。
+2. `build_history_xlsx.py`：工作簿默认字体、含中文单元格字体、图表标题与刻度字体统一 Noto Sans SC 10 pt；`--check` 第 9、12 项说明同步；`--png` 出图字体顺序改为 Noto 优先，Arial 系只在没有 Noto 时兜底。
+### 四、SKILL.md、PROMPT.md
+版本行改 0.17.0，要点写明统一字体与原因；文中所有"中文 Arial、英文与数字 Noto Sans SC"的描述改为统一 Noto Sans SC；Part B 一句去掉"暂仍输出 Arial"。
+### 五、测试
+`tests/run_tests.sh`：第 5 节历史数据工作簿默认字体断言改为 Noto Sans SC 10；第 6 节 md2docx 断言样式层 ascii 与 eastAsia 都是 Noto Sans SC。全部通过，无跳过。
+
 ## research-prompt 0.2.0 — 2026-11-05：任务书模板库以 Google Drive 为准
 起因：Bill 把任务书模板库从本仓库的 `research-prompt/模板库/` 搬到 Google Drive `百万美金研究库/90_任务书模板库/`（README、参考骨架、周期全景模板三份 Google 文档），Drive 入口文件已加地图、写任务书、入库三处。仓库里的旧路径还指着本地文件夹，写任务书的 AI 会把旧副本当正本读、往本地写新模板。
 1. `SKILL.md` 开头加"任务书模板库在 Google Drive"一段：路径 `百万美金研究库/90_任务书模板库/` 与文件夹链接；每次用之前先查 Drive 当前内容，以 Drive 为准，不记具体文件、不写文件 ID；本地旧副本只读参考。第三步第 1 条改为先查 Drive 再挑模板，第 3 条入库改为按 Drive 入口文件"入库"一节存进 Drive（Google 文档），不往本仓库写。

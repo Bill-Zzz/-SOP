@@ -14,8 +14,8 @@
   页面    A4 竖版（全部页面，无横向页），四边 2 cm，单栏；页眉左报告名、右"代码 · 日期"（报告名取 --title 或报告标题；代码、日期取
           --ticker / --date，否则从报告标题、再从文件名里认），页脚居中"页码 / 总页数"（PAGE / NUMPAGES 域），
           页眉页脚 Noto Sans SC 8 pt。
-  字体    中文 Arial、英文与数字 Noto Sans SC（格式规范 V1.41 G01/G02；rFonts 的 eastAsia 与 ascii/hAnsi 分设，正文
-          样式层统一配置，中文段另在 run 上显式写）；正文 10.5 pt，行距 1.0，段后 6 pt；一、二、三级标题 18 / 14 / 12 pt
+  字体    中文、英文与数字统一 Noto Sans SC（格式规范第 3 节，research-sop 0.17.0；rFonts 的 eastAsia 与 ascii/hAnsi
+          都写 Noto Sans SC，正文样式层统一配置，中文段另在 run 上显式写，防 Google 转换回退日文字体）；正文 10.5 pt，行距 1.0，段后 6 pt；一、二、三级标题 18 / 14 / 12 pt
           加粗黑色，段前段后 16/8、12/6、8/4 pt，行距 1.0。
   注释    以"表注""图注""来源""资料来源""数据与可编辑图表""口径说明""注："开头的段落与图片的图注：9 pt 灰色 #666666。
   顺序    报告标题 → 一页摘要 → 目录 → 一、结论与概述 → 各章 → 附：口径与说明；一页摘要紧接标题，目录、正文各一级
@@ -71,8 +71,8 @@ try:
 except ImportError:  # pragma: no cover
     sys.exit("缺少 python-docx：pip install python-docx --break-system-packages")
 
-LATIN = "Noto Sans SC"   # 英文、拉丁字母与数字（格式规范 V1.41 G02）
-CJK_FONT = "Arial"       # 中文（格式规范 V1.41 G01）
+LATIN = "Noto Sans SC"   # 英文、拉丁字母与数字（格式规范 G02）
+CJK_FONT = "Noto Sans SC" # 中文（格式规范 G01；0.17.0 起与英文数字统一，不再用 Arial：中英分设在 Google 文档里逐行行高不同）
 BODY_PT = 10.5
 TABLE_PT = 9.5           # 表头与表体（格式规范第 6 节）
 NOTE_PT = 9
@@ -643,10 +643,9 @@ def set_run_font(rpr_owner_el, name):
 
 
 def script_runs(par, text, size=None):
-    """按文字分段写 run：中文段（汉字、全角标点）显式用中文字体 CJK_FONT（Arial），西文与数字段继承样式（LATIN，Noto Sans SC）。
-    样式层已按 ascii/eastAsia 分设中西文字体，Word 认；Google 文档转换时只认 run 的西文字体、不认东亚字体，
-    中文会回退到 MS PGothic 一类日文字体并丢掉粗体（2026-11-04 实测），所以中文段在 run 上再写一次同一字体。
-    中文设为 Arial 后的实际替代字形按格式规范 V1.41 第 3 节另行记录，不据此改回别的字体。"""
+    """按文字分段写 run：中文段（汉字、全角标点）显式写 CJK_FONT，西文与数字段继承样式（LATIN）；0.17.0 起两者都是 Noto Sans SC。
+    Google 文档转换时只认 run 的西文字体、不认东亚字体，中文会回退到 MS PGothic 一类日文字体并丢掉粗体
+    （2026-11-04 实测），所以中文段在 run 上再写一次同一字体。中英统一一个字体族，Google 里每行行高一致。"""
     out = []
     for piece in RE_CJK_RUN.split(text):
         if not piece:
@@ -1369,7 +1368,7 @@ def verify_docx(path, expect):
     n = st["Normal"]
     a, e = rfonts(n.element)
     pf = n.paragraph_format
-    add(f"正文中文 {CJK_FONT}、英文与数字 {LATIN} 分设，{BODY_PT} pt、行距 {BODY_LINE}、段后 6 pt",
+    add(f"正文中文、英文与数字统一 {LATIN}，{BODY_PT} pt、行距 {BODY_LINE}、段后 6 pt",
         (a, e) == (LATIN, CJK_FONT) and n.font.size == Pt(BODY_PT) and pf.line_spacing == BODY_LINE
         and pf.space_after == Pt(6), f"英文数字 {a}、中文 {e}、{n.font.size.pt if n.font.size else None} pt、行距 {pf.line_spacing}")
     bad = []
