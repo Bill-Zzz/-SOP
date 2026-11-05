@@ -44,7 +44,8 @@
 写在一页摘要之前；一页摘要之后的第一章不含"结论与概述"，或其下没有"结论""概述"两个子标题或以 **结论** / **概述**
 开头的加粗段；最后一个一级标题不是"口径与说明"；"修订说明""本报告的取舍""来源"作为节标题——都报出）；出处标注与过程用语（只检查不改写：正文——不含图下"数据与可编辑图表"行与代码块——里的
 "[R数字""[S数字""p数字]"和"研报库""台账""对账""取证"，报总数并按所在标题列出）；
-图号与文件名（只检查不改写：图注"图 N"按出现顺序 1、2、3……严格递增，图片文件名里的 figN 与图号一致，
+图表优先（只提示，不影响退出码：一段或一条列表项里数字 ≥ 12 个、一张表里纯数值单元格 ≥ 40 个、正文章——不含"一、结论与概述"和附——没有图，
+都列出，执行 AI 逐条改成图、删减或在自检写明保留理由；格式规范第 7 节 V02–V04）；图号与文件名（只检查不改写：图注"图 N"按出现顺序 1、2、3……严格递增，图片文件名里的 figN 与图号一致，
 正文引用的"图 N"不超过图总数）。生成 .docx 后读回逐项核对格式
 （页面、页眉页脚、字体字号行距、标题、注释、顺序与分页、目录样式、表格底色边框内边距对齐合计行列宽），打印"格式检查：x/y 通过"。
 .md 里的图片文件不存在时列出并以非零码退出（不输出 docx）；格式检查有不通过项时退出码 1。
@@ -1254,6 +1255,49 @@ def check_citations(blocks, heads):
                 hits[where].extend(found)
     return sum(len(v) for v in hits.values()), [(w, hits[w]) for w in order]
 
+
+# 图表优先（格式规范第 7 节 V02–V04，软门槛：只提示，不影响退出码）
+RE_NUM_TOKEN = re.compile(r"(?<![A-Za-z])[-−+]?\d[\d,]*(?:\.\d+)?%?")
+RE_NUM_CELL = re.compile(r"[-−+]?\(?[-−+]?\d[\d,]*(\.\d+)?\)?\s*(%|x|倍|亿|万|pt|个月|季|天|年)?")
+NOTE_LEAD = ("表注", "图注", "来源", "资料来源", "数据与可编辑图表", "口径说明", "注：", "注:")
+DENSE_NUMS = 12        # 一段（或一条列表项）里数字 ≥ 12 个 → 数字墙提示
+BIG_TABLE_CELLS = 40   # 一张表里纯数值单元格 ≥ 40 个 → 数值大表提示
+
+
+def check_chart_first(blocks, heads):
+    """格式规范第 7 节"图表优先"：可比序列、走势、阶段、先后用图表达，正文与表格只留关键节点数字与口径。
+    只提示不改写、不影响退出码：数字密集段落、数值大表、没有图的正文章。返回 dict。"""
+    hmap = {h["idx"]: h for h in heads}
+    where, dense, big, chap_imgs, cur = "（标题前）", [], [], {}, None
+    for k, b in enumerate(blocks):
+        if b[0] == "h":
+            h = hmap.get(k)
+            if h:
+                where = h["text"]
+                if h["level"] == 1:
+                    cur = h if h["role"] == "body" and "结论与概述" not in h["text"] else None
+                    if cur is not None:
+                        chap_imgs[cur["text"]] = 0
+            continue
+        if b[0] == "img":
+            if cur is not None:
+                chap_imgs[cur["text"]] += 1
+            continue
+        if b[0] in ("p", "quote", "ul", "ol"):
+            t = plain(b[1] if b[0] in ("p", "quote") else b[1][1])
+            if t.startswith(NOTE_LEAD):
+                continue
+            n = len(RE_NUM_TOKEN.findall(t))
+            if n >= DENSE_NUMS:
+                dense.append(f"「{where}」：一段 {n} 个数字（「{t[:20]}…」）——能画成图的改成图，正文只留关键节点数字")
+        elif b[0] == "table":
+            cells = [plain(c) for _, r in b[1]["rows"] for c in r]
+            nnum = sum(1 for c in cells if c and RE_NUM_CELL.fullmatch(c.replace(" ", "")))
+            if nnum >= BIG_TABLE_CELLS:
+                big.append(f"「{where}」的表：{nnum} 个纯数值单元格——序列改成图，表格只留口径与关键节点")
+    nofig = [f"「{c}」：没有图" for c, n in chap_imgs.items() if n == 0]
+    return {"dense": dense, "big": big, "nofig": nofig}
+
 RE_FIG_NO = re.compile(r"^\s*图\s*(\d+)")
 RE_FIG_FILE = re.compile(r"fig0*(\d+)", re.I)
 RE_FIG_REF = re.compile(r"图\s?(\d+)")
@@ -1333,7 +1377,7 @@ def check(blocks, img_root):
             "bad_rows": bad_rows, "no_src": no_src, "title_mode": title_mode, "outline": heads,
             "num_issues": num_issues, "ncount": ncount, "unit_issues": unit_issues,
             "shell_issues": check_shell(blocks, heads), "cite": check_citations(blocks, heads),
-            "src_ids": src_ids, "fig_issues": check_figures(blocks)[1]}
+            "src_ids": src_ids, "fig_issues": check_figures(blocks)[1], "chart_first": check_chart_first(blocks, heads)}
 
 
 def verify_docx(path, expect):
@@ -1529,6 +1573,12 @@ def main(argv=None):
           + "".join(f"\n  - 「{w}」{len(v)} 处：{'、'.join(v)}" for w, v in cite_at))
     print(f"图号与文件名（只检查不改写）：图片 {r['imgs']} 张；问题 {len(r['fig_issues'])} 处"
           + "".join(f"\n  - {x}" for x in r["fig_issues"]))
+    cf = r["chart_first"]
+    print(f"图表优先（只提示，不影响退出码；格式规范第 7 节 V02–V04）：数字密集段落 {len(cf['dense'])} 处、"
+          f"数值大表 {len(cf['big'])} 张、没有图的正文章 {len(cf['nofig'])} 个"
+          + "".join(f"\n  - {x}" for x in (cf["dense"] + cf["big"] + cf["nofig"])[:30])
+          + (f"\n  - ……另 {len(cf['dense']) + len(cf['big']) + len(cf['nofig']) - 30} 处" if
+             len(cf["dense"]) + len(cf["big"]) + len(cf["nofig"]) > 30 else ""))
     if r["missing"]:
         print(f"错误：{len(r['missing'])} 张图片文件不存在（图片根目录 {img_root}）：", file=sys.stderr)
         for p in r["missing"]:

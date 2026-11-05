@@ -11,6 +11,8 @@
 #      格式规范 Part A 格式检查：中文、英文与数字统一 Noto Sans SC、行距 1.0、表格 9.5 pt、目录「　…　」）并读回核对；
 #      缺一页摘要报出；不合规样例（卷首元信息、第一章不是结论与概述、正文带 [R23475 p5]、来源行带编号、
 #      取舍 / 来源 / 修订说明在正文）逐项报出
+#      图表优先（格式规范第 7 节 V01–V05）：md2docx 软门槛提示数字墙、数值大表、没有图的正文章且不影响退出码；规则在规范、
+#      审稿清单 ⑩⑪、自检模板里
 #   7) check_delivery.py：用 rclone lsjson 样例 JSON（tests/fixtures/check_delivery_*.json）离线核对 Drive 布局、
 #      命名、格式，并核对本地 成品/、留痕/复用、复核；第 12 项 Google 文档目录二级条目带页码用导出文本样例
 #      （tests/fixtures/toc_good、toc_missing）与人工确认样例（toc_evidence_*.txt）测硬门槛；不联网
@@ -328,6 +330,62 @@ body = "\n".join(p.text for p in d.paragraphs)
 assert "**" not in body and "[R" not in body
 print("md2docx：A4 页面、页眉页脚、标题→一页摘要→目录→一、结论与概述→各章→附：口径与说明分页、字体对换与行距、表格 9.5 pt、目录分隔符、标题层级与字号、单位表头、合计行、列宽、注释、表题、缺图报错均正确")
 EOF
+
+# 图表优先（格式规范第 7 节 V01–V05）：md2docx 软门槛提示 + 规则落在正式文件里
+cat > "$TMP/chartfirst.md" <<'EOF2'
+# 某周期
+
+## 一页摘要
+
+结论一段。
+
+## 一、结论与概述
+
+### 1.1　结论
+
+判断。
+
+### 1.2　概述
+
+概述。
+
+## 二、历史
+
+1985 年 12 月到 1986 年 6 月跌 17%，1989 年 3 月到 1990 年 7 月跌 21%，1996 年 1 月到 1998 年 6 月跌 25%，2000 年 9 月到 2001 年 12 月跌 45%。
+
+| 年份 | 收入（亿美元） | 资本开支（亿美元） | 库存（天） | 价格（%） |
+|---|---|---|---|---|
+| 2016 | 1.0 | 2.0 | 3.0 | 4.0 |
+| 2017 | 1.1 | 2.1 | 3.1 | 4.1 |
+| 2018 | 1.2 | 2.2 | 3.2 | 4.2 |
+| 2019 | 1.3 | 2.3 | 3.3 | 4.3 |
+| 2020 | 1.4 | 2.4 | 3.4 | 4.4 |
+| 2021 | 1.5 | 2.5 | 3.5 | 4.5 |
+| 2022 | 1.6 | 2.6 | 3.6 | 4.6 |
+| 2023 | 1.7 | 2.7 | 3.7 | 4.7 |
+| 2024 | 1.8 | 2.8 | 3.8 | 4.8 |
+
+## 附：口径与说明
+
+口径。
+EOF2
+python3 research-sop/scripts/md2docx.py "$TMP/chartfirst.md" --check-only > "$TMP/cf.txt"   # 软门槛：有提示也退出码 0
+grep -q "图表优先（只提示，不影响退出码；格式规范第 7 节 V02–V04）：数字密集段落 1 处、数值大表 1 张、没有图的正文章 1 个" "$TMP/cf.txt" \
+  || { echo "图表优先提示不对"; cat "$TMP/cf.txt"; exit 1; }
+grep -q "「二、历史」：没有图" "$TMP/cf.txt"
+grep -q "「二、历史」的表：45 个纯数值单元格" "$TMP/cf.txt"
+for f in research-sop/standards/格式规范.md research-sop/SKILL.md research-sop/PROMPT.md; do
+  grep -q "图表优先" "$f" || { echo "$f 缺图表优先规则"; exit 1; }
+done
+grep -q "^| V05 | key_round_price_phase_chart | \*\*硬门槛\*\*" research-sop/standards/格式规范.md
+grep -q "^| V02 | number_wall | 软门槛" research-sop/standards/格式规范.md
+grep -q "⑩ \*\*（硬性）重要轮次的\"股价走势 + 阶段\"图\*\*" research-sop/standards/审稿清单.md
+grep -q "⑪ \*\*（软性）图表优先提示已逐条处理\*\*" research-sop/standards/审稿清单.md
+grep -q "⑩ （硬性）重要轮次" research-sop/templates/trail_selfcheck.md && grep -q "⑪ （软性）图表优先提示处理" research-sop/templates/trail_selfcheck.md
+if grep -n "审稿清单.md\` 九条" research-sop/SKILL.md research-sop/PROMPT.md research-sop/templates/trail_selfcheck.md research-prompt/templates/任务书模板.md; then
+  echo "审稿清单已是十一条，不得再写九条"; exit 1
+fi
+echo "图表优先：md2docx 报出数字墙、数值大表、没有图的正文章且不影响退出码；V01–V05 写进格式规范（V05 硬门槛、V02 软门槛），审稿清单 ⑩ 硬性、⑪ 软性，自检模板同步，审稿清单计数改为十一条"
 
 echo "== 7. check_delivery.py（离线，lsjson 样例） =="
 python3 research-sop/scripts/check_delivery.py --help | grep -q -- "--drive"
