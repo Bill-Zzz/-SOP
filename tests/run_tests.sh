@@ -12,7 +12,8 @@
 #      缺一页摘要报出；不合规样例（卷首元信息、第一章不是结论与概述、正文带 [R23475 p5]、来源行带编号、
 #      取舍 / 来源 / 修订说明在正文）逐项报出
 #   7) check_delivery.py：用 rclone lsjson 样例 JSON（tests/fixtures/check_delivery_*.json）离线核对 Drive 布局、
-#      命名、格式，并核对本地 成品/、留痕/复用、复核；不联网
+#      命名、格式，并核对本地 成品/、留痕/复用、复核；第 12 项 Google 文档目录二级条目带页码用导出文本样例
+#      （tests/fixtures/toc_good、toc_missing）与人工确认样例（toc_evidence_*.txt）测硬门槛；不联网
 #   8) research-prompt：SKILL.md 有 frontmatter name，任务书模板与模板库文件齐，SKILL.md 与任务书模板不含题型内容
 # 用法：bash tests/run_tests.sh   （在仓库根目录运行）
 set -euo pipefail
@@ -333,8 +334,9 @@ mkdir -p "$TMP/task/成品" "$TMP/task/留痕/ACME/复用" "$TMP/task/留痕/ACM
 touch "$TMP/task/成品/ACME_库存周期研究_20261105_V1.0.md" "$TMP/task/留痕/ACME/复用/结论卡.md" \
   "$TMP/task/留痕/ACME/复用/来源清单.csv" "$TMP/task/留痕/ACME/复用/数字台账.csv" "$TMP/task/留痕/ACME/复核/自检.md"
 python3 research-sop/scripts/check_delivery.py --lsjson tests/fixtures/check_delivery_good.json --local "$TMP/task" \
-  | tee "$TMP/cd_good.txt"
-grep -q "结果：14/14 通过" "$TMP/cd_good.txt"
+  --toc-text tests/fixtures/toc_good | tee "$TMP/cd_good.txt"
+grep -q "结果：15/15 通过" "$TMP/cd_good.txt"
+grep -q "12. 通过    Google 文档目录：二级条目必须有页码（硬性）（2 份）" "$TMP/cd_good.txt"
 grep -q "Google 文档）（2 份）" "$TMP/cd_good.txt"
 grep -q "PNG 只在 底稿/图片/ 下（2 张）" "$TMP/cd_good.txt"
 grep -q "1 篇：ACME；另有 底稿说明、共用数据/" "$TMP/cd_good.txt"
@@ -344,7 +346,8 @@ if python3 research-sop/scripts/check_delivery.py --lsjson tests/fixtures/check_
   echo "不合规的交付应以非零码退出"; exit 1
 fi
 cat "$TMP/cd_bad.txt"
-for s in "结果：2/14 通过" "      - 20261105_库存周期_v1_ClaudeCode" "      - ACME_库存周期研究_20261105_v1" \
+for s in "结果：2/15 通过" "      - 20261105_库存周期_v1_ClaudeCode" \
+    "ACME_库存周期研究_20261105_v1：取不到文档文本，也没有 --toc-evidence 人工确认（缺证据不通过）" "      - ACME_库存周期研究_20261105_v1" \
     "ACME_图表数据_20261105_V1.0.xlsx：xlsx 原件" "      - 报告/" "底稿/ACME/ 缺 自检" \
     "底稿/ACME/结论卡.md：结论卡应为 Google 文档，现为 md 原件" "底稿/ACME/数字台账.csv：数字台账应为 Google 表格，现为 csv 原件" \
     "      - 底稿/ACME/图02_分部.png" "底稿/图片/XYZ/：没有同名的 底稿/XYZ/" "底稿/图片/图03_现金流.png：应放进 底稿/图片/<篇>/" \
@@ -356,7 +359,33 @@ done
 if grep -q "共用数据/ 缺\|ACME_底稿说明_20261105" "$TMP/cd_bad.txt"; then echo "共用数据/ 不按篇要求四类、第一份底稿说明应放行"; exit 1; fi
 if grep -q "来源清单.xlsx" "$TMP/cd_bad.txt"; then echo "无元数据、Size -1 的 .xlsx 应认作 Google 表格"; exit 1; fi
 if grep -q "10-K_2025.pdf\|IR页面存档" "$TMP/cd_good.txt"; then echo "来源/ 里的原件应原样放行"; exit 1; fi
-echo "check_delivery：合规样例（含底稿说明、共用数据/）14/14 通过；不合规样例逐项报出命名、原件、自创文件夹、底稿/ 根下散文件、缺件（含 共用数据/ 之外的文件夹）、格式（含 共用数据/）、PNG 位置、raw、本地缺 复核/ 与数字台账，退出码 1"
+echo "check_delivery：合规样例（含底稿说明、共用数据/）15/15 通过；不合规样例逐项报出命名、原件、自创文件夹、底稿/ 根下散文件、缺件（含 共用数据/ 之外的文件夹）、格式（含 共用数据/）、PNG 位置、raw、目录缺证据、本地缺 复核/ 与数字台账，退出码 1"
+# 第 12 项：Google 文档目录二级条目必须有页码（硬性；缺页码、无目录段、缺证据都不通过）
+CD="python3 research-sop/scripts/check_delivery.py --lsjson tests/fixtures/check_delivery_good.json"
+toc_fail() {  # 用法：toc_fail 期望输出 -- 额外参数…
+  local want="$1"; shift 2
+  if $CD "$@" > "$TMP/cd_toc.txt"; then echo "目录页码不合规应以非零码退出：$*"; exit 1; fi
+  grep -q "12. 不通过  Google 文档目录：二级条目必须有页码（硬性）" "$TMP/cd_toc.txt" \
+    || { echo "第 12 项应不通过：$*"; cat "$TMP/cd_toc.txt"; exit 1; }
+  grep -qF -- "$want" "$TMP/cd_toc.txt" || { echo "缺少预期输出：$want"; cat "$TMP/cd_toc.txt"; exit 1; }
+}
+toc_fail "ACME_库存周期研究_20261105_V1.0：二级条目无页码 3/3 条，首条「1.1 结论 …」" -- --toc-text tests/fixtures/toc_missing
+toc_fail "半导体_存储周期研究_20261105：找不到“目录”一行" -- --toc-text tests/fixtures/toc_missing
+toc_fail "ACME_库存周期研究_20261105_V1.0：取不到文档文本，也没有 --toc-evidence 人工确认（缺证据不通过）" --
+toc_fail "ACME_库存周期研究_20261105_V1.0：人工确认写的是「二级目录带页码：否」" -- --toc-evidence tests/fixtures/toc_evidence_no.txt
+toc_fail "半导体_存储周期研究_20261105：取不到文档文本，--toc-evidence 里没有这份文档的确认行（缺证据不通过）" -- \
+  --toc-evidence tests/fixtures/toc_evidence_no.txt
+toc_fail "--toc-evidence 文件不存在" -- --toc-evidence "$TMP/没有这个文件.txt"
+toc_fail "--report 指定的「不存在的报告」不在根目录的 Google 文档里" -- --toc-text tests/fixtures/toc_good --report 不存在的报告
+$CD --toc-evidence tests/fixtures/toc_evidence_good.txt > "$TMP/cd_toc.txt"
+grep -q "结果：12/12 通过" "$TMP/cd_toc.txt"
+$CD --toc-text tests/fixtures/toc_missing --toc-evidence tests/fixtures/toc_evidence_good.txt > "$TMP/cd_toc.txt" \
+  && { echo "取到文本时人工证据不能推翻文本结果"; exit 1; }
+$CD --toc-text tests/fixtures/toc_missing --report 半导体_存储周期研究_20261105 > "$TMP/cd_toc.txt" \
+  && { echo "--report 指定的无目录文档应不通过"; exit 1; }
+$CD --toc-text tests/fixtures/toc_good --report ACME_库存周期研究_20261105_V1.0 > "$TMP/cd_toc.txt"
+grep -q "Google 文档目录：二级条目必须有页码（硬性）（1 份）" "$TMP/cd_toc.txt"
+echo "check_delivery 第 12 项：二级目录带页码通过；缺页码、无目录段、无文本又无证据、证据写否、证据缺行、证据文件不存在、--report 不存在都不通过且退出码 1；有文本时证据不能推翻；--report 只核对指定报告"
 
 echo "== 8. research-prompt =="
 grep -q "^name: research-prompt$" research-prompt/SKILL.md

@@ -36,7 +36,7 @@ tests/          自检（GitHub Actions 自动运行）
 research-sop/           第二个 skill：Research SOP，主题·行业·公司研究（不建模、不停下、禁止点预测；0.10.0 前名为 company-dossier）
   SKILL.md              方法：范围 → 检索 → 阅读 → 主题/行业/公司三层写作 → 自检 → 交付 → 复盘
   PROMPT.md             精简版，粘贴到对话式 AI（必须联网）
-  scripts/              build_history_xlsx.py（历史数据 Excel，--png 导出图表快照）、md2docx.py（报告 .md → .docx）、check_delivery.py（核对上传到 Drive 的交付）
+  scripts/              build_history_xlsx.py（历史数据 Excel，--png 导出图表快照）、md2docx.py（报告 .md → .docx）、check_delivery.py（核对上传到 Drive 的交付；第 12 项 Google 文档目录二级条目必须带页码，硬性）
   standards/            格式规范（并入 Bill 格式规范 V1.41）、存储规范、转换后修补清单、审稿清单（执行 AI 机械检查自查用；内容由 Bill 审）
   templates/            报告外壳模板 report_shell.md（标题 → 一页摘要 → 目录 → 一、结论与概述 → 任务书定的各章 → 附：口径与说明）；数字台账、来源清单、自检、结论卡等留档模板
   prompts/              可直接发给其他 AI 的提示词包（公司清单、主题报告）
