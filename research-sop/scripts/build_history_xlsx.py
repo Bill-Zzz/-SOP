@@ -1394,7 +1394,7 @@ class Builder:
 
     def sheet_sources(self):
         ws, ex = self.ws["来源"], self.ex
-        title(ws, "来源", "来源 ID 对应各表最后一列。路径相对于 futu_export 根目录（Drive：计算机 › 我的 Mac › futu_export）。")
+        title(ws, "来源", "来源 ID 对应各表最后一列。路径相对于 futu_export 根目录。")
         section(ws, "A3", "财务数据来源")
         hdr(ws, 4, ["来源ID", "文件", "网址 / 位置", "表格或页码定位"])
         rows = [("F1", ex.long_file, f"{ex.code}/{ex.long_file}（富途 OpenD 导出，文件日期 {ex.long_mtime}）",
