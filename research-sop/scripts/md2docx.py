@@ -6,22 +6,26 @@
   python3 md2docx.py 输入.md --check-only [--img-root 目录]      只做检查，不输出 docx
 
 标题层级：.md 只有一个 # 且它是第一个标题时，# 是报告标题（Title 样式），##、###、#### 依次为一、二、三级标题
-（Heading 1/2/3）；否则 #、##、### 直接为一、二、三级。"目录"用独立样式，不进目录、不计编号；"一、结论与概述"是
-正文第一章，照常编号；以"附"开头的是附录，照常进目录、另起一页，按自己的编号体系。旧稿里第一个正文章之前含"摘要"的
-一级标题（一页摘要）仍用独立样式，含"修订说明 / 修订记录"的仍另起一页，但"报告外壳"检查会报。
+（Heading 1/2/3）；否则 #、##、### 直接为一、二、三级。"目录"与"一页摘要"（第一个正文章之前含"摘要"的一级标题）
+用独立样式，不进目录、不计编号；"一、结论与概述"是正文第一章，照常编号；以"附"开头的是附录，照常进目录、另起一页，
+按自己的编号体系。含"修订说明 / 修订记录"的仍另起一页，但"报告外壳"检查会报。
 
 版式（standards/格式规范.md Part A）：
-  页面    A4 纵向，四边 2 cm，单栏；页眉左报告名、右"代码 · 日期"（报告名取 --title 或报告标题；代码、日期取
+  页面    A4 竖版（全部页面，无横向页），四边 2 cm，单栏；页眉左报告名、右"代码 · 日期"（报告名取 --title 或报告标题；代码、日期取
           --ticker / --date，否则从报告标题、再从文件名里认），页脚居中"页码 / 总页数"（PAGE / NUMPAGES 域），
-          页眉页脚 Arial 8 pt。
-  字体    西文与数字 Arial、中文 Noto Sans SC（rFonts 的 ascii/hAnsi 与 eastAsia 分设，正文样式层统一配置）；正文
-          10.5 pt，行距 1.25，段后 6 pt；一、二、三级标题 18 / 14 / 12 pt 加粗黑色，段前段后 16/8、12/6、8/4 pt，行距 1.0。
+          页眉页脚 Noto Sans SC 8 pt。
+  字体    中文 Arial、英文与数字 Noto Sans SC（格式规范 V1.41 G01/G02；rFonts 的 eastAsia 与 ascii/hAnsi 分设，正文
+          样式层统一配置，中文段另在 run 上显式写）；正文 10.5 pt，行距 1.0，段后 6 pt；一、二、三级标题 18 / 14 / 12 pt
+          加粗黑色，段前段后 16/8、12/6、8/4 pt，行距 1.0。
   注释    以"表注""图注""来源""资料来源""数据与可编辑图表""口径说明""注："开头的段落与图片的图注：9 pt 灰色 #666666。
-  顺序    报告标题 → 目录（Word 目录域 TOC \\o "1-2" \\h，打开时更新）→ 一、结论与概述 → 各章 → 附：口径与说明；
-          目录、正文各一级板块、附录另起一页（段前分页）。
-  表格    真表格；表头底色 #17365D、白字 10.5 pt 加粗、水平垂直居中，"指标（单位）"把全角括号里的单位软换行到下一行、
-          9 pt 常规；表体 10.5 pt、白底、段后 0、边框 #D9D9D9 0.5 pt、内边距 4 pt；数值、日期、编号、评级居中，
-          文本左对齐（说明文字行距 0.85，其余 1.25），垂直顶端；首格为"合计 / 总计"的行加粗、加上边框；表宽 = 版心
+  顺序    报告标题 → 一页摘要 → 目录 → 一、结论与概述 → 各章 → 附：口径与说明；一页摘要紧接标题，目录、正文各一级
+          板块、附录另起一页（段前分页）。
+  目录    Word 目录域 TOC \\o "1-2" \\h \\z \\u \\n 1-1 \\p "　…　"，打开时更新：一级条目 10 pt 加粗、不显示页码；
+          二级条目 10 pt 常规、左缩进 18 pt，"标题　…　页码"（页码灰色 #666666，不右对齐、不用点线）；行距 1.25，
+          一级段前 10 pt、二级段后 5 pt。"研究正文 / 附录与资料"分组栏头与同名二级导航条目不由脚本生成（见修补清单 D1）。
+  表格    真表格；表头底色 #17365D、白字 9.5 pt 加粗、水平垂直居中，"指标（单位）"把全角括号里的单位软换行到下一行、
+          9 pt 常规；表体 9.5 pt、白底、段后 0、行距 1.0（说明文字同）、边框 #D9D9D9 0.5 pt、内边距 4 pt；数值、日期、
+          编号、评级居中，文本左对齐，垂直顶端；首格为"合计 / 总计"的行加粗、加上边框；表宽 = 版心
           （表格缩进 4 pt = 单元格左内边距，外框正好落在版心左右边线上），
           列宽按最长实际值分配，叙述列吃剩余宽度；表题（表格前一段以"表 1"之类开头）10 pt 加粗；字号不缩小。
   体积    去掉模板里用不到的样式与部件（stylesWithEffects、主题、webSettings、字体表、缩略图、customXml），
@@ -36,13 +40,13 @@
 图下来源行（只检查不改写：来源行或"数据与可编辑图表"行带 R / S 编号或页码的报出，来源行只写数据提供方与口径）；
 标题编号（只检查不改写：一级"一、"连续、二级"1.1　"父级前缀与序号连续且后接全角空格、三级"1.1.1"，附录"附一、"连续；
 报错号、跳号、重号、缺编号、缺全角空格）；表头单位（半角括号、数值列表头缺单位）；报告外壳（只检查不改写：报告标题与
-第一个一级标题之间有段落、表格或列表；标题后第一个一级标题不含"结论与概述"；其下没有"结论""概述"两个子标题或以
-**结论** / **概述** 开头的加粗段；最后一个一级标题不是"口径与说明"；任何一级出现"一页摘要""修订说明""本报告的取舍"
-"来源"作为节标题——都报出）；出处标注与过程用语（只检查不改写：正文——不含图下"数据与可编辑图表"行与代码块——里的
+"一页摘要"之间有段落、表格或列表；标题后第一个一级标题不是"一页摘要"，或一页摘要下没有内容、出现第二个摘要、"目录"
+写在一页摘要之前；一页摘要之后的第一章不含"结论与概述"，或其下没有"结论""概述"两个子标题或以 **结论** / **概述**
+开头的加粗段；最后一个一级标题不是"口径与说明"；"修订说明""本报告的取舍""来源"作为节标题——都报出）；出处标注与过程用语（只检查不改写：正文——不含图下"数据与可编辑图表"行与代码块——里的
 "[R数字""[S数字""p数字]"和"研报库""台账""对账""取证"，报总数并按所在标题列出）；
 图号与文件名（只检查不改写：图注"图 N"按出现顺序 1、2、3……严格递增，图片文件名里的 figN 与图号一致，
 正文引用的"图 N"不超过图总数）。生成 .docx 后读回逐项核对格式
-（页面、页眉页脚、字体字号行距、标题、注释、目录域与分页、表格底色边框内边距对齐合计行列宽），打印"格式检查：x/y 通过"。
+（页面、页眉页脚、字体字号行距、标题、注释、顺序与分页、目录样式、表格底色边框内边距对齐合计行列宽），打印"格式检查：x/y 通过"。
 .md 里的图片文件不存在时列出并以非零码退出（不输出 docx）；格式检查有不通过项时退出码 1。
 
 只依赖 python-docx 与标准库（pip install python-docx --break-system-packages）；不调用 pandoc，不联网。
@@ -58,7 +62,7 @@ try:
     from docx.enum.section import WD_ORIENT
     from docx.enum.style import WD_STYLE_TYPE
     from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
-    from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT, WD_TAB_LEADER
+    from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
     from docx.image.image import Image as DocxImage
     from docx.opc.constants import RELATIONSHIP_TYPE as RT
     from docx.oxml import OxmlElement
@@ -67,15 +71,18 @@ try:
 except ImportError:  # pragma: no cover
     sys.exit("缺少 python-docx：pip install python-docx --break-system-packages")
 
-LATIN = "Arial"
-CJK_FONT = "Noto Sans SC"
+LATIN = "Noto Sans SC"   # 英文、拉丁字母与数字（格式规范 V1.41 G02）
+CJK_FONT = "Arial"       # 中文（格式规范 V1.41 G01）
 BODY_PT = 10.5
+TABLE_PT = 9.5           # 表头与表体（格式规范第 6 节）
 NOTE_PT = 9
 HF_PT = 8
 CAPTION_PT = 10
-BODY_LINE = 1.25
+BODY_LINE = 1.0          # 正文与表格文字单倍行距（格式规范 S01）
 HEAD_LINE = 1.0
-TEXT_CELL_LINE = 0.85
+TEXT_CELL_LINE = 1.0     # 表体说明文字不再单设行距（V1.23）
+TOC_LINE = 1.25          # 目录独立行距（S02）
+TOC_SEP = "\u3000\u2026\u3000"   # 目录标题与页码之间的固定分隔符「　…　」（C06）
 BLACK = RGBColor(0, 0, 0)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 NOTE_COLOR = RGBColor(0x66, 0x66, 0x66)
@@ -453,17 +460,17 @@ def column_widths(head, rows):
     need, is_text, longest = [], [], []
     for j in range(n):
         body = [r[j] for r in rows if j < len(r)]
-        vals = [cell_need_pt(c, BODY_PT) for c in body] or [0.0]
+        vals = [cell_need_pt(c, TABLE_PT) for c in body] or [0.0]
         ind, unit = split_head(head[j])
         txt = any(not is_value(c) for c in body)
         is_text.append(txt)
         longest.append(max(vals))
         # 完整数值单行显示；单位不拆行；指标名可以换行（至少容得下 3 个汉字）
-        ind_need = min(text_width_pt(ind, BODY_PT, True), max(max(vals), 3 * BODY_PT * 1.06))
+        ind_need = min(text_width_pt(ind, TABLE_PT, True), max(max(vals), 3 * TABLE_PT * 1.06))
         need.append(max(max(vals), text_width_pt(unit or "", NOTE_PT), ind_need) + pad)
     total = TEXT_W / 20.0
     overflow = False
-    narrative = [j for j in range(n) if is_text[j] and longest[j] > 6 * BODY_PT]
+    narrative = [j for j in range(n) if is_text[j] and longest[j] > 6 * TABLE_PT]
     if sum(need) <= total:
         extra = total - sum(need)
         grow = narrative or list(range(n))
@@ -473,7 +480,7 @@ def column_widths(head, rows):
         data = [j for j in range(n) if not is_text[j]]
         texts = [j for j in range(n) if is_text[j]]
         rest = total - sum(need[j] for j in data)
-        min_text = 4 * BODY_PT + pad
+        min_text = 4 * TABLE_PT + pad
         if texts and rest >= min_text * len(texts):
             base = sum(need[j] for j in texts)
             w = [need[j] if j in data else max(min_text, rest * need[j] / base) for j in range(n)]
@@ -598,10 +605,10 @@ def setup_styles(doc):
     set_fonts(cap, CAPTION_PT, BLACK, True, False)
     para_fmt(cap, 0, 4, BODY_LINE, keep_next=True)
     th = get_style(doc, TH_STYLE)
-    set_fonts(th, BODY_PT, WHITE, True, False)
+    set_fonts(th, TABLE_PT, WHITE, True, False)
     para_fmt(th, 0, 0, HEAD_LINE, align=WD_ALIGN_PARAGRAPH.CENTER)
     td = get_style(doc, TD_STYLE)
-    set_fonts(td, BODY_PT, BLACK, None, False)
+    set_fonts(td, TABLE_PT, BLACK, None, False)
     para_fmt(td, 0, 0, BODY_LINE)
     tdt = get_style(doc, TDT_STYLE, TD_STYLE)
     para_fmt(tdt, 0, 0, TEXT_CELL_LINE)
@@ -616,9 +623,12 @@ def setup_styles(doc):
     for k, name in enumerate(TOC_STYLES):
         s = get_style(doc, name)
         set_fonts(s, CAPTION_PT, BLACK, k == 0, False)
-        para_fmt(s, 10 if k == 0 else 0, 0 if k == 0 else 5, BODY_LINE)
+        para_fmt(s, 10 if k == 0 else 0, 0 if k == 0 else 5, TOC_LINE)
         s.paragraph_format.left_indent = Pt(0 if k == 0 else 18)
-        s.paragraph_format.tab_stops.add_tab_stop(Twips(TEXT_W), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS)
+        ppr = s.element.get_or_add_pPr()  # 不用右对齐制表位与点线（C06、C07）
+        tabs = ppr.find(qn("w:tabs"))
+        if tabs is not None:
+            ppr.remove(tabs)
 
 
 # ---------------------------------------------------------------- 段内元素
@@ -633,9 +643,10 @@ def set_run_font(rpr_owner_el, name):
 
 
 def script_runs(par, text, size=None):
-    """按文字分段写 run：中文段（汉字、全角标点）显式用 Noto Sans SC，西文与数字段继承样式（Arial）。
+    """按文字分段写 run：中文段（汉字、全角标点）显式用中文字体 CJK_FONT（Arial），西文与数字段继承样式（LATIN，Noto Sans SC）。
     样式层已按 ascii/eastAsia 分设中西文字体，Word 认；Google 文档转换时只认 run 的西文字体、不认东亚字体，
-    中文会回退到 MS PGothic 一类日文字体并丢掉粗体（2026-11-04 实测），所以中文段在 run 上再写一次同一字体。"""
+    中文会回退到 MS PGothic 一类日文字体并丢掉粗体（2026-11-04 实测），所以中文段在 run 上再写一次同一字体。
+    中文设为 Arial 后的实际替代字形按格式规范 V1.41 第 3 节另行记录，不据此改回别的字体。"""
     out = []
     for piece in RE_CJK_RUN.split(text):
         if not piece:
@@ -650,7 +661,7 @@ def script_runs(par, text, size=None):
 
 
 def code_runs(par, text, size=None):
-    """代码段：西文用 Consolas，中文段同样显式 Noto Sans SC。"""
+    """代码段：西文用 Consolas，中文段同样显式中文字体 CJK_FONT。"""
     for piece in RE_CJK_RUN.split(text):
         if not piece:
             continue
@@ -883,7 +894,8 @@ def setup_page(doc, report, ticker, date):
 
 
 def add_toc(doc, entries):
-    """目录：独立标题"目录"（段前分页）+ 目录域（TOC \\o "1-2" \\h \\z \\u，缓存结果为各条目，页码打开时更新）。"""
+    """目录：独立标题"目录"（段前分页）+ 目录域（TOC \\o "1-2" \\h \\z \\u \\n 1-1 \\p "　…　"，缓存结果为各条目，
+    页码打开时更新）。一级条目只有标题链接、不显示页码；二级条目"标题　…　页码"，链接只在标题文字上，页码灰色。"""
     h = doc.add_paragraph(style=ALONE_STYLE)
     script_runs(h, "目录")
     h.paragraph_format.page_break_before = True
@@ -905,17 +917,22 @@ def add_toc(doc, entries):
         p = doc.add_paragraph(style=TOC_STYLES[min(lv, 2) - 1])
         paras.append(p)
         if anchor:
-            hl = add_hyperlink(p, text, anchor=anchor)
-            tab = OxmlElement("w:r")
-            tab.append(OxmlElement("w:tab"))
-            hl.append(tab)
-            for r in (fld_run("begin"), fld_run("instr", f"PAGEREF {anchor} \\h"), fld_run("separate"),
-                      fld_run("text", ""), fld_run("end")):
-                hl.append(r)
+            add_hyperlink(p, text, anchor=anchor)
+            if lv >= 2:
+                for sep in script_runs(p, TOC_SEP):
+                    sep.font.color.rgb = NOTE_COLOR
+                for r in (fld_run("begin"), fld_run("instr", f"PAGEREF {anchor} \\h"), fld_run("separate"),
+                          fld_run("text", ""), fld_run("end")):
+                    rpr = OxmlElement("w:rPr")
+                    c = OxmlElement("w:color")
+                    c.set(qn("w:val"), "666666")
+                    rpr.append(c)
+                    r.insert(0, rpr)
+                    p._p.append(r)
         else:
             script_runs(p, text)
     first, last = paras[0]._p, paras[-1]._p
-    head = [fld_run("begin"), fld_run("instr", 'TOC \\o "1-2" \\h \\z \\u'), fld_run("separate")]
+    head = [fld_run("begin"), fld_run("instr", f'TOC \\o "1-2" \\h \\z \\u \\n 1-1 \\p "{TOC_SEP}"'), fld_run("separate")]
     for r in reversed(head):
         if first.pPr is not None:
             first.pPr.addnext(r)
@@ -1058,7 +1075,7 @@ def convert(blocks, heads, title_mode, img_root, out, meta, toc=True):
                 doc.add_paragraph()
             _, overflow = write_table(doc, data, None)
             if overflow:
-                warnings.append(f"第 {data['line']} 行的表格：版心放不下全部数据列，数据可能断行，考虑横向页或分表")
+                warnings.append(f"第 {data['line']} 行的表格：版心放不下全部数据列，数据可能断行，按竖版分表处理（格式规范 A03，不用横向页）")
         prev = kind
     if not toc_done:
         add_toc(doc, toc_entries)
@@ -1146,43 +1163,61 @@ def head_core(text):
 
 
 def check_shell(blocks, heads):
-    """格式规范第 2 节报告外壳：标题 → 一、结论与概述（下有结论、概述）→ 任务书定的各章 → 附：口径与说明；
-    不设一页摘要，取舍、来源、修订说明进底稿。只检查不改写。"""
+    """格式规范第 2 节报告外壳：标题 → 一页摘要 → 目录 → 一、结论与概述（下有结论、概述）→ 任务书定的各章 →
+    附：口径与说明；目录由脚本插在一页摘要之后；取舍、来源、修订说明进底稿。只检查不改写。"""
     issues = []
     h1 = [h for h in heads if h["level"] == 1 and h["role"] != "toc"]
     title = next((h for h in heads if h["level"] == 0), None)
     if not h1:
-        return ["没有一级标题：标题后应为'一、结论与概述'，最后一节为'附：口径与说明'"]
+        return ["没有一级标题：标题后应为'一页摘要'，再目录、'一、结论与概述'，最后一节为'附：口径与说明'"]
     first = h1[0]
     start = title["idx"] + 1 if title and title["idx"] < first["idx"] else 0
     front = [b for b in blocks[start:first["idx"]] if b[0] != "h"]
     if front:
         lead = plain(front[0][1]) if front[0][0] in ("p", "quote") else front[0][0]
         meta = any(b[0] in ("p", "quote") and RE_META.search(plain(b[1])) for b in front)
-        issues.append(f"标题与第一章之间有 {len(front)} 段（首段「{lead[:30]}」），标题后应直接进'一、结论与概述'"
+        issues.append(f"标题与第一个一级标题之间有 {len(front)} 段（首段「{lead[:30]}」），标题后应直接进'一页摘要'"
                       + ("；元信息放'附：口径与说明'" if meta else ""))
-    if "结论与概述" not in first["text"]:
-        issues.append(f"标题后第一个一级标题应为'一、结论与概述'，现为'{first['text']}'")
+    summary = first if first["role"] == "summary" else None
+    if summary is None:
+        issues.append(f"标题后第一个一级标题应为'一页摘要'，现为'{first['text']}'")
     else:
         end = h1[1]["idx"] if len(h1) > 1 else len(blocks)
-        subs = [head_core(h["text"]) for h in heads if first["idx"] < h["idx"] < end and h["level"] >= 2]
-        bolds = [b[1] if b[0] in ("p", "quote") else b[1][1] for b in blocks[first["idx"] + 1:end]
+        if not any(b[0] != "h" for b in blocks[summary["idx"] + 1:end]):
+            issues.append("'一页摘要'下没有内容：应写结论与主要内容的一页浓缩")
+        toc_h = next((h for h in heads if h["role"] == "toc"), None)
+        if toc_h and toc_h["idx"] < summary["idx"]:
+            issues.append("'目录'写在一页摘要之前：目录应在一页摘要之后、'一、结论与概述'之前（不写时脚本自动插）")
+    for h in h1[1:]:
+        if h["role"] == "summary":
+            issues.append(f"'{h['text']}'：一页摘要只能有一个，紧接标题")
+    body = [h for h in h1 if h["role"] != "summary"]
+    if not body:
+        issues.append("一页摘要之后没有正文章：应为'一、结论与概述'及任务书定的各章")
+    elif "结论与概述" not in body[0]["text"]:
+        issues.append(f"一页摘要与目录之后的第一章应为'一、结论与概述'，现为'{body[0]['text']}'")
+    else:
+        chap = body[0]
+        nxt = [h for h in h1 if h["idx"] > chap["idx"]]
+        end = nxt[0]["idx"] if nxt else len(blocks)
+        subs = [head_core(h["text"]) for h in heads if chap["idx"] < h["idx"] < end and h["level"] >= 2]
+        bolds = [b[1] if b[0] in ("p", "quote") else b[1][1] for b in blocks[chap["idx"] + 1:end]
                  if b[0] in ("p", "quote", "ul", "ol")]
         for need in ("结论", "概述"):
             if not any(t.startswith(need) for t in subs) and \
                     not any(re.match(rf"\s*\*\*{need}", t) for t in bolds):
-                issues.append(f"'{first['text']}'下缺'{need}'：应有'{need}'子标题或以 **{need}** 开头的加粗段")
+                issues.append(f"'{chap['text']}'下缺'{need}'：应有'{need}'子标题或以 **{need}** 开头的加粗段")
     last = h1[-1]
     if not any("口径与说明" in h["text"] for h in h1):
         issues.append("文末没有'附：口径与说明'一节（口径、数据截至、版本、免责声明放这里）")
     elif "口径与说明" not in last["text"]:
         issues.append(f"最后一节应为'附：口径与说明'，现为'{last['text']}'")
     for h in heads:
-        if h["level"] < 1 or h["role"] == "toc":
+        if h["level"] < 1 or h["role"] in ("toc", "summary"):
             continue
         t, core = h["text"], head_core(h["text"])
         if "一页摘要" in t or (h["level"] == 1 and core.startswith("摘要")):
-            issues.append(f"'{t}'作为节标题出现：不设一页摘要，改写为'一、结论与概述'")
+            issues.append(f"'{t}'作为节标题出现在正文：一页摘要只放在标题之后、目录之前")
         elif "修订说明" in t or "修订记录" in t:
             issues.append(f"'{t}'作为节标题出现在正文：修订说明进底稿 复核/修订说明_Vx.md")
         elif "本报告的取舍" in t or core.startswith("取舍"):
@@ -1321,7 +1356,7 @@ def verify_docx(path, expect):
     ok = (pg.get(qn("w:w")), pg.get(qn("w:h"))) == (str(PAGE_W), str(PAGE_H)) and pg.get(qn("w:orient")) in (None, "portrait")
     ok &= all(mar.get(qn(f"w:{s}")) == str(MARGIN) for s in ("top", "bottom", "left", "right"))
     ok &= cols is None or cols.get(qn("w:num")) in (None, "1")
-    add("A4 纵向、四边 2 cm、单栏", ok, f"纸张 {pg.get(qn('w:w'))}×{pg.get(qn('w:h'))} twips，边距 {mar.get(qn('w:top'))}")
+    add("A4 竖版、四边 2 cm、单栏", ok, f"纸张 {pg.get(qn('w:w'))}×{pg.get(qn('w:h'))} twips，边距 {mar.get(qn('w:top'))}")
     st = d.styles
     hdr_txt = "".join(p.text for p in sec.header.paragraphs)
     hdr_ok = expect["report"] in hdr_txt and "\t" in hdr_txt and expect["date"] in hdr_txt
@@ -1329,14 +1364,14 @@ def verify_docx(path, expect):
     fxml = sec.footer._element.xml
     ftr_ok = "PAGE" in fxml and "NUMPAGES" in fxml and sec.footer.paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.CENTER
     hf_ok = all(st[n].font.size == Pt(HF_PT) and st[n].font.name == LATIN for n in ("Header", "Footer"))
-    add("页眉左报告名、右代码与日期；页脚居中 页码 / 总页数；Arial 8 pt", hdr_ok and ftr_ok and hf_ok,
+    add(f"页眉左报告名、右代码与日期；页脚居中 页码 / 总页数；{LATIN} 8 pt", hdr_ok and ftr_ok and hf_ok,
         f"页眉「{hdr_txt.replace(chr(9), ' ⇥ ')}」")
     n = st["Normal"]
     a, e = rfonts(n.element)
     pf = n.paragraph_format
-    add("正文 Arial / Noto Sans SC 分设、10.5 pt、行距 1.25、段后 6 pt",
+    add(f"正文中文 {CJK_FONT}、英文与数字 {LATIN} 分设，{BODY_PT} pt、行距 {BODY_LINE}、段后 6 pt",
         (a, e) == (LATIN, CJK_FONT) and n.font.size == Pt(BODY_PT) and pf.line_spacing == BODY_LINE
-        and pf.space_after == Pt(6), f"西文 {a}、中文 {e}、{n.font.size.pt if n.font.size else None} pt、行距 {pf.line_spacing}")
+        and pf.space_after == Pt(6), f"英文数字 {a}、中文 {e}、{n.font.size.pt if n.font.size else None} pt、行距 {pf.line_spacing}")
     bad = []
     for lv, (size, before, after) in HEADS.items():
         s = st[f"Heading {lv}"]
@@ -1370,7 +1405,7 @@ def verify_docx(path, expect):
             rf = r.find(qn("w:rPr") + "/" + qn("w:rFonts"))
             if rf is None or rf.get(qn("w:ascii")) != CJK_FONT or RE_CJK_RUN.sub("", t):
                 cjk_bad.append(t[:8])
-    add("中文段落单独成 run 并显式 Noto Sans SC（Google 文档只认 run 字体）", not cjk_bad,
+    add(f"中文段落单独成 run 并显式 {CJK_FONT}（Google 文档只认 run 字体）", not cjk_bad,
         f"中文 run {n_cjk}；不符 {cjk_bad[:4] or '无'}")
     body = d.element.body
     xml = body.xml
@@ -1382,8 +1417,16 @@ def verify_docx(path, expect):
         order_ok = texts.index(expect["summary"]) < texts.index("目录") < texts.index(expect["first_body"]) \
             if expect["first_body"] else True
     want_pb = ["目录"] + expect["h1_break"]
-    add("顺序 标题→目录→正文；目录、各一级板块、附录另起一页", has_toc and order_ok and pb == want_pb,
+    add("顺序 标题→一页摘要→目录→正文；目录、各一级板块、附录另起一页", has_toc and order_ok and pb == want_pb,
         f"目录域{'有' if has_toc else '无'}；段前分页 {len(pb)} 处（应为 {len(want_pb)}）")
+    t1, t2 = st[TOC_STYLES[0]], st[TOC_STYLES[1]]
+    toc_ok = f'\\n 1-1 \\p "{TOC_SEP}"' in xml if has_toc else True
+    toc_ok &= t1.font.size == Pt(CAPTION_PT) and bool(t1.font.bold) and t2.font.size == Pt(CAPTION_PT) and not t2.font.bold
+    toc_ok &= t2.paragraph_format.left_indent == Pt(18) and t1.paragraph_format.space_before == Pt(10) \
+        and t2.paragraph_format.space_after == Pt(5)
+    toc_ok &= all(x.paragraph_format.line_spacing == TOC_LINE and x.element.pPr.find(qn("w:tabs")) is None for x in (t1, t2))
+    add("目录：一级 10 pt 加粗无页码；二级 10 pt 常规缩进 18 pt，「标题　…　页码」不右对齐不用点线；行距 1.25", toc_ok,
+        f"目录域开关{'含' if has_toc and TOC_SEP in xml else '缺'} \\n 1-1 与「　…　」")
     tb_bad = []
     for ti, t in enumerate(d.tables, start=1):
         tblpr = t._tbl.tblPr
@@ -1427,9 +1470,9 @@ def verify_docx(path, expect):
                         tb_bad.append(f"表{ti} 合计行")
                         break
     th, td = st[TH_STYLE], st[TD_STYLE]
-    sty_ok = th.font.size == Pt(BODY_PT) and th.font.bold and th.font.color.rgb == WHITE and td.font.size == Pt(BODY_PT) \
+    sty_ok = th.font.size == Pt(TABLE_PT) and th.font.bold and th.font.color.rgb == WHITE and td.font.size == Pt(TABLE_PT) \
         and td.paragraph_format.space_after == Pt(0) and st[TDT_STYLE].paragraph_format.line_spacing == TEXT_CELL_LINE
-    add("表格：表头 #17365D 白字 10.5 pt 加粗居中、单位 9 pt 常规；表体 10.5 pt 白底段后 0、边框 #D9D9D9 0.5 pt、"
+    add("表格：表头 #17365D 白字 9.5 pt 加粗居中、单位 9 pt 常规；表体 9.5 pt 白底段后 0 行距 1.0、边框 #D9D9D9 0.5 pt、"
         "内边距 4 pt、数值居中文本左对齐顶端、合计行加粗上边框、表宽 = 版心", not tb_bad and sty_ok,
         f"{len(d.tables)} 张表；不符 {tb_bad[:6] or '无'}")
     caps = [p for p in paras if p.style.name == CAPTION_STYLE]
