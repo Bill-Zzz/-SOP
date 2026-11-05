@@ -5,6 +5,7 @@
   python3 check_delivery.py --drive "gdrive:百万美金研究库/10_工作区/YYYYMMDD_任务名" [--local 本地任务文件夹]
   python3 check_delivery.py --lsjson 已保存的lsjson.json [--local 本地任务文件夹]     离线核对（测试用）
   第 12 项（目录页码）可另加：--report 报告名（可多次） --toc-text 导出文本目录 --toc-evidence 人工确认文件
+  第 13 项（图表工作簿结构）可另加：--workbook 工作簿名（可多次） --workbook-dir 导出 xlsx 的目录（离线）
 
 读 Drive：调用 `rclone lsjson -R -M <路径>`（-M 读出 Drive 的真实类型 content-type；rclone 版本不支持 -M 时自动去掉重试）。
 rclone 把 Google 文档、表格显示成带 .docx / .xlsx 后缀、Size 为 -1 的文件：本脚本按 content-type 判断，没有元数据时
@@ -31,6 +32,14 @@ Drive 检查项（布局见 Drive 入口文件；命名按 standards/存储规�
      取不到某份报告的文本时，必须由 --toc-evidence 给出人工确认（每行：文档名｜二级目录带页码：是｜YYYY-MM-DD｜确认人），
      缺文件、缺这一行、写"否"、格式不对都不通过——不默认通过。取到了文本就以文本为准，人工证据不能推翻文本结果。
      默认核对根目录全部 Google 文档；同一任务文件夹里有旧版本或非报告文档时，用 --report 指定本次交付的报告（可多次）。
+  13 图表工作簿结构（硬性；格式规范第 13.1 节 WB01、WB02、WB05、WB06）：根目录名含"图表数据"或"历史数据"的
+     Google 表格，导出为 xlsx（`rclone cat "<路径>/<表格名>.xlsx" --drive-export-formats xlsx`；离线用 --workbook-dir）
+     后逐份查：工作表用语义名，没有"图1数据""Chart 2 Data""Sheet1"这类编号或默认页名；第一张可见工作表是"图表总览"，
+     上面有原生图表（只有图号索引、没有图表不算看板），总览图表的数据引用指向名含"计算"的工作表；有名含"计算"的
+     工作表（如"图表计算"）；有名含"来源"的来源页。取不到工作簿即不通过。
+     核对哪几份：给了 --workbook 只查这几份；否则给了 --report 时，查与报告同一研究对象、版本号相同或不带版本号的
+     图表数据 / 历史数据表格；都没给时查根目录全部这类表格。一份都没有时记"不适用"（报告没有配套图表工作簿）。
+     来源 ID 能否追到、报告每张数据图在总览上有没有对应原生图，脚本查不了，由审稿清单 ⑫ 人工查。
 
 本地检查项（给了 --local 才做；本地任务文件夹里 成品/ 可在根目录，也可在每篇子文件夹里）：
   L1 有 成品/，里面有报告（.md 或 .docx）
@@ -41,11 +50,15 @@ Drive 检查项（布局见 Drive 入口文件；命名按 standards/存储规�
 结果原样粘进自检的机器查部分。只用标准库；不改 Drive、不改本地文件。
 """
 import argparse
+import io
 import json
 import os
+import posixpath
 import re
 import subprocess
 import sys
+import zipfile
+from xml.etree import ElementTree as ET
 
 NAME_RE = re.compile(r"^[^_]+_[^_]+_\d{8}(_V\d+\.\d+)?$")
 GDOC = "application/vnd.google-apps.document"
@@ -73,6 +86,11 @@ TOC_PAGE_RE = re.compile(r"(?:[\t　…]|\.{2,}|\s)\s*\d{1,4}$")
 TOC_TAIL_RE = re.compile(r"[\s　….]*\d{0,4}$")
 TOC_CLAIM = "二级目录带页码：是"
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# 图表工作簿检查（第 13 项）
+WB_KEYS = ("图表数据", "历史数据")
+WB_OVERVIEW, WB_CALC, WB_SOURCE = "图表总览", "计算", "来源"
+WB_NUMBERED_RE = re.compile(r"^\s*(?:图表?|表|fig(?:ure)?\.?|chart|sheet|工作表)\s*[0-9０-９]+", re.I)
+WB_VERSION_RE = re.compile(r"_V\d+\.\d+$")
 
 
 class Item:
@@ -321,6 +339,148 @@ def check_toc(items, args):
     return [("Google 文档目录：二级条目必须有页码（硬性）", bad, f"{len(docs)} 份")]
 
 
+REL_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+
+
+def _rels(z, part):
+    """读 part 的关系文件，返回 {Id: (Type 末段, 目标部件路径)}。"""
+    d, f = posixpath.split(part)
+    path = posixpath.join(d, "_rels", f + ".rels")
+    if path not in z.namelist():
+        return {}
+    out = {}
+    for el in ET.fromstring(z.read(path)):
+        tgt = el.get("Target", "")
+        tgt = tgt[1:] if tgt.startswith("/") else posixpath.normpath(posixpath.join(d, tgt))
+        out[el.get("Id")] = (el.get("Type", "").rsplit("/", 1)[-1], tgt)
+    return out
+
+
+def _ref_sheet(ref):
+    """图表数据引用 'Sheet 名'!$A$1:$A$9 → Sheet 名。"""
+    m = re.match(r"^\s*'((?:[^']|'')+)'!|^\s*([^!'\s]+)!", ref or "")
+    if not m:
+        return None
+    return (m.group(1) or m.group(2)).replace("''", "'")
+
+
+def parse_workbook(data):
+    """xlsx 字节 → [{name, hidden, charts, refs}]，按工作簿里的顺序。只用标准库，读 Google 导出与 openpyxl 写出的 xlsx。"""
+    z = zipfile.ZipFile(io.BytesIO(data))
+    wb_rels = _rels(z, "xl/workbook.xml")
+    sheets = []
+    for el in ET.fromstring(z.read("xl/workbook.xml")).iter():
+        if not el.tag.endswith("}sheet"):
+            continue
+        part = wb_rels.get(el.get(REL_NS), ("", ""))[1]
+        charts, refs = 0, set()
+        for typ, drawing in _rels(z, part).values():
+            if typ != "drawing":
+                continue
+            for typ2, chart in _rels(z, drawing).values():
+                if typ2 != "chart" or chart not in z.namelist():
+                    continue
+                charts += 1
+                for f in ET.fromstring(z.read(chart)).iter():
+                    if f.tag.endswith("}f") and f.text:
+                        sh = _ref_sheet(f.text)
+                        if sh:
+                            refs.add(sh)
+        sheets.append({"name": el.get("name", ""), "hidden": el.get("state", "visible") != "visible",
+                       "charts": charts, "refs": refs})
+    return sheets
+
+
+def workbook_problems(sheets):
+    """一份图表工作簿的问题列表与说明；问题为空 = 通过。"""
+    bad = []
+    names = [s["name"] for s in sheets]
+    numbered = [n for n in names if WB_NUMBERED_RE.match(n)]
+    if numbered:
+        bad.append(f"编号或默认页名 {len(numbered)} 张（{'、'.join(numbered[:5])}{'……' if len(numbered) > 5 else ''}）"
+                   "——按内容起语义名，如“历年营收与业务拆分”“××数据来源”")
+    ov = next((s for s in sheets if s["name"] == WB_OVERVIEW), None)
+    visible = [s for s in sheets if not s["hidden"]]
+    if ov is None:
+        bad.append(f"没有“{WB_OVERVIEW}”工作表")
+    else:
+        if not visible or visible[0] is not ov:
+            bad.append(f"第一张可见工作表是“{visible[0]['name'] if visible else '无'}”，应是“{WB_OVERVIEW}”")
+        if ov["charts"] == 0:
+            bad.append(f"“{WB_OVERVIEW}”上没有原生图表——总览是集中全部重要数据图的看板，只有图号索引不算")
+        off = sorted(r for r in ov["refs"] if WB_CALC not in r)
+        if off:
+            bad.append(f"“{WB_OVERVIEW}”的图表引用了 {'、'.join(off[:3])}——总览图的数据区放在名含“{WB_CALC}”的工作表")
+    if not any(WB_CALC in n for n in names):
+        bad.append(f"没有名含“{WB_CALC}”的工作表（如“图表计算”，放总览图的公式数据区，可隐藏）")
+    if not any(WB_SOURCE in n for n in names):
+        bad.append(f"没有名含“{WB_SOURCE}”的来源页（来源 ID → 文件、链接、页码或字段）")
+    total = sum(s["charts"] for s in sheets)
+    note = f"工作表 {len(sheets)} 张，总览原生图表 {ov['charts'] if ov else 0} 张，全簿 {total} 张"
+    return bad, note
+
+
+def _wb_version(name):
+    m = WB_VERSION_RE.search(name)
+    return m.group(0) if m else ""
+
+
+def select_workbooks(items, args):
+    """第 13 项要查的根目录 Google 表格；返回 (表格列表, 问题列表)。"""
+    sheets = [i for i in items if len(i.parts) == 1 and not i.is_dir and i.kind == GSHEET]
+    if args.workbook:
+        names = {s.name for s in sheets}
+        bad = [f"--workbook 指定的「{w}」不在根目录的 Google 表格里" for w in args.workbook if w not in names]
+        return [s for s in sheets if s.name in args.workbook], bad
+    wbs = [s for s in sheets if any(k in s.name for k in WB_KEYS)]
+    if args.report:
+        keep = []
+        for r in args.report:
+            obj, ver = r.split("_", 1)[0], _wb_version(r)
+            keep += [w for w in wbs if w.name.split("_", 1)[0] == obj and _wb_version(w.name) in (ver, "")
+                     and w not in keep]
+        wbs = keep
+    return wbs, []
+
+
+def export_workbook(drive, item):
+    """用 rclone 把 Drive 上的 Google 表格导出成 xlsx 字节；失败返回 None。"""
+    path = "/".join(item.parts[:-1] + [item.name + ".xlsx"])
+    try:
+        r = subprocess.run(["rclone", "cat", f"{drive.rstrip('/')}/{path}", "--drive-export-formats", "xlsx"],
+                           capture_output=True)
+    except FileNotFoundError:
+        return None
+    return r.stdout if r.returncode == 0 and r.stdout[:2] == b"PK" else None
+
+
+def check_workbooks(items, args):
+    """第 13 项：图表工作簿结构（语义页名、图表总览看板、图表计算、来源页）。取不到工作簿 = 不通过。"""
+    wbs, bad = select_workbooks(items, args)
+    notes = []
+    for w in wbs:
+        data = None
+        if args.workbook_dir:
+            p = os.path.join(args.workbook_dir, w.name + ".xlsx")
+            if os.path.isfile(p):
+                with open(p, "rb") as f:
+                    data = f.read()
+        elif args.drive:
+            data = export_workbook(args.drive, w)
+        if data is None:
+            bad.append(f"{w.name}：取不到工作簿（--drive 时用 rclone 导出 xlsx；离线用 --workbook-dir）")
+            continue
+        try:
+            probs, note = workbook_problems(parse_workbook(data))
+        except (zipfile.BadZipFile, KeyError, ET.ParseError) as e:
+            bad.append(f"{w.name}：读不出工作簿结构（{e}）")
+            continue
+        bad += [f"{w.name}：{x}" for x in probs]
+        notes.append(f"{w.name}：{note}")
+    ok_note = f"{len(wbs)} 份；" + "；".join(notes) if wbs else "没有配套图表工作簿，不适用"
+    return [("图表工作簿：语义页名、图表总览看板、图表计算、来源页（硬性）", bad, ok_note)]
+
+
 def _has(dirpath, key):
     for _, _, fs in os.walk(dirpath):
         if any(key in f for f in fs):
@@ -396,11 +556,15 @@ def main(argv=None):
     ap.add_argument("--toc-evidence",
                     help="第 12 项人工确认证据文件：每行 文档名｜二级目录带页码：是｜YYYY-MM-DD｜确认人；"
                          "只在取不到文档文本时采用，缺证据即不通过")
+    ap.add_argument("--workbook", action="append", default=[],
+                    help="第 13 项只核对这份图表工作簿（根目录 Google 表格名，不带后缀；可多次）；"
+                         "不给时按 --report 的研究对象与版本号挑，都不给则查全部名含“图表数据”“历史数据”的表格")
+    ap.add_argument("--workbook-dir", help="第 13 项离线：读这个目录里的 <表格名>.xlsx（Google 表格导出的 xlsx）")
     args = ap.parse_args(argv)
 
     items = load_items(args)
     print(f"交付核对：{args.drive or args.lsjson}（{sum(not i.is_dir for i in items)} 个文件）")
-    groups = [("Drive", check_drive(items) + check_toc(items, args))]
+    groups = [("Drive", check_drive(items) + check_toc(items, args) + check_workbooks(items, args))]
     if args.local:
         groups.append((f"本地 {args.local}", check_local(args.local)))
     n = ok = 0
