@@ -385,7 +385,11 @@ grep -q "⑩ （硬性）重要轮次" research-sop/templates/trail_selfcheck.md
 if grep -n "审稿清单.md\` 九条" research-sop/SKILL.md research-sop/PROMPT.md research-sop/templates/trail_selfcheck.md research-prompt/templates/任务书模板.md; then
   echo "审稿清单已是十一条，不得再写九条"; exit 1
 fi
-echo "图表优先：md2docx 报出数字墙、数值大表、没有图的正文章且不影响退出码；V01–V05 写进格式规范（V05 硬门槛、V02 软门槛），审稿清单 ⑩ 硬性、⑪ 软性，自检模板同步，审稿清单计数改为十一条"
+for f in research-sop/standards/格式规范.md research-sop/SKILL.md research-sop/PROMPT.md; do
+  grep -q '只拿到这一份文档的冷读者"来写：事实本身写清楚，读这一份就够。' "$f" || { echo "$f 缺写法硬要求 5（写给冷读者）"; exit 1; }
+done
+grep -q "⑨ 按冷读者通读一遍" research-sop/standards/审稿清单.md
+echo "图表优先：md2docx 报出数字墙、数值大表、没有图的正文章且不影响退出码；V01–V05 写进格式规范（V05 硬门槛、V02 软门槛），审稿清单 ⑩ 硬性、⑪ 软性，自检模板同步，审稿清单计数改为十一条；写法硬要求 5 写给冷读者在规范、SKILL、PROMPT 与审稿清单 ⑨ 里"
 
 echo "== 7. check_delivery.py（离线，lsjson 样例） =="
 python3 research-sop/scripts/check_delivery.py --help | grep -q -- "--drive"
