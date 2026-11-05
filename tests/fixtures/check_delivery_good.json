@@ -1,0 +1,272 @@
+[
+{
+"Path": "ACME_库存周期研究_20261105_V1.0.docx",
+"Name": "ACME_库存周期研究_20261105_V1.0.docx",
+"Size": -1,
+"MimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture001",
+"Metadata": {
+"content-type": "application/vnd.google-apps.document"
+}
+},
+{
+"Path": "ACME_图表数据_20261105_V1.0.xlsx",
+"Name": "ACME_图表数据_20261105_V1.0.xlsx",
+"Size": -1,
+"MimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture002",
+"Metadata": {
+"content-type": "application/vnd.google-apps.spreadsheet"
+}
+},
+{
+"Path": "半导体_存储周期研究_20261105.docx",
+"Name": "半导体_存储周期研究_20261105.docx",
+"Size": -1,
+"MimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture003",
+"Metadata": {
+"content-type": "application/vnd.google-apps.document"
+}
+},
+{
+"Path": "底稿",
+"Name": "底稿",
+"Size": 0,
+"MimeType": "inode/directory",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": true,
+"ID": "fixture004"
+},
+{
+"Path": "底稿/ACME",
+"Name": "ACME",
+"Size": 0,
+"MimeType": "inode/directory",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": true,
+"ID": "fixture005"
+},
+{
+"Path": "底稿/ACME/来源",
+"Name": "来源",
+"Size": 0,
+"MimeType": "inode/directory",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": true,
+"ID": "fixture006"
+},
+{
+"Path": "底稿/图片",
+"Name": "图片",
+"Size": 0,
+"MimeType": "inode/directory",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": true,
+"ID": "fixture007"
+},
+{
+"Path": "底稿/图片/ACME",
+"Name": "ACME",
+"Size": 0,
+"MimeType": "inode/directory",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": true,
+"ID": "fixture008"
+},
+{
+"Path": "底稿/ACME/结论卡.docx",
+"Name": "结论卡.docx",
+"Size": -1,
+"MimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture009",
+"Metadata": {
+"content-type": "application/vnd.google-apps.document"
+}
+},
+{
+"Path": "底稿/ACME/自检.docx",
+"Name": "自检.docx",
+"Size": -1,
+"MimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture010",
+"Metadata": {
+"content-type": "application/vnd.google-apps.document"
+}
+},
+{
+"Path": "底稿/ACME/复核记录.docx",
+"Name": "复核记录.docx",
+"Size": -1,
+"MimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture011",
+"Metadata": {
+"content-type": "application/vnd.google-apps.document"
+}
+},
+{
+"Path": "底稿/ACME/数据缺口.docx",
+"Name": "数据缺口.docx",
+"Size": -1,
+"MimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture012",
+"Metadata": {
+"content-type": "application/vnd.google-apps.document"
+}
+},
+{
+"Path": "底稿/ACME/来源清单.xlsx",
+"Name": "来源清单.xlsx",
+"Size": -1,
+"MimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture013",
+"Metadata": {
+"content-type": "application/vnd.google-apps.spreadsheet"
+}
+},
+{
+"Path": "底稿/ACME/数字台账.xlsx",
+"Name": "数字台账.xlsx",
+"Size": -1,
+"MimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture014",
+"Metadata": {
+"content-type": "application/vnd.google-apps.spreadsheet"
+}
+},
+{
+"Path": "底稿/ACME/研报摘要卡.xlsx",
+"Name": "研报摘要卡.xlsx",
+"Size": -1,
+"MimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture015",
+"Metadata": {
+"content-type": "application/vnd.google-apps.spreadsheet"
+}
+},
+{
+"Path": "底稿/ACME/台账_库存天数.xlsx",
+"Name": "台账_库存天数.xlsx",
+"Size": -1,
+"MimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture016",
+"Metadata": {
+"content-type": "application/vnd.google-apps.spreadsheet"
+}
+},
+{
+"Path": "底稿/ACME/来源/10-K_2025.pdf",
+"Name": "10-K_2025.pdf",
+"Size": 120000,
+"MimeType": "application/pdf",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture017",
+"Metadata": {
+"content-type": "application/pdf"
+}
+},
+{
+"Path": "底稿/ACME/来源/IR页面存档.html",
+"Name": "IR页面存档.html",
+"Size": 8000,
+"MimeType": "text/html",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture018",
+"Metadata": {
+"content-type": "text/html"
+}
+},
+{
+"Path": "底稿/图片/ACME/图01_营收与增速.png",
+"Name": "图01_营收与增速.png",
+"Size": 40000,
+"MimeType": "image/png",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture019",
+"Metadata": {
+"content-type": "image/png"
+}
+},
+{
+"Path": "底稿/图片/ACME/图A_份额变迁.png",
+"Name": "图A_份额变迁.png",
+"Size": 40000,
+"MimeType": "image/png",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture020",
+"Metadata": {
+"content-type": "image/png"
+}
+},
+{
+"Path": "底稿/ACME_底稿说明_20261105.docx",
+"Name": "ACME_底稿说明_20261105.docx",
+"Size": -1,
+"MimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture201",
+"Metadata": {
+"content-type": "application/vnd.google-apps.document"
+}
+},
+{
+"Path": "底稿/共用数据",
+"Name": "共用数据",
+"Size": 0,
+"MimeType": "inode/directory",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": true,
+"ID": "fixture202"
+},
+{
+"Path": "底稿/共用数据/共用_价格序列.xlsx",
+"Name": "共用_价格序列.xlsx",
+"Size": -1,
+"MimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture203",
+"Metadata": {
+"content-type": "application/vnd.google-apps.spreadsheet"
+}
+},
+{
+"Path": "底稿/共用数据/台账_汇率.xlsx",
+"Name": "台账_汇率.xlsx",
+"Size": -1,
+"MimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+"ModTime": "2026-11-05T10:00:00.000Z",
+"IsDir": false,
+"ID": "fixture204",
+"Metadata": {
+"content-type": "application/vnd.google-apps.spreadsheet"
+}
+}
+]

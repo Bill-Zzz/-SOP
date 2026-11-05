@@ -36,7 +36,7 @@ tests/          自检（GitHub Actions 自动运行）
 research-sop/           第二个 skill：Research SOP，主题·行业·公司研究（不建模、不停下、禁止点预测；0.10.0 前名为 company-dossier）
   SKILL.md              方法：范围 → 检索 → 阅读 → 主题/行业/公司三层写作 → 自检 → 交付 → 复盘
   PROMPT.md             精简版，粘贴到对话式 AI（必须联网）
-  scripts/              build_history_xlsx.py（历史数据 Excel，--png 导出图表快照）、md2docx.py（报告 .md → .docx）
+  scripts/              build_history_xlsx.py（历史数据 Excel，--png 导出图表快照）、md2docx.py（报告 .md → .docx）、check_delivery.py（核对上传到 Drive 的交付）
   templates/            公司报告、行业报告、主题报告模板；股价事件台账、历史节点台账
   prompts/              可直接发给其他 AI 的提示词包（公司清单、主题报告）
 company-dossier/        旧目录占位，只有 README.md：说明已更名为 research-sop 及新脚本地址

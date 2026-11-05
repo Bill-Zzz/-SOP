@@ -33,7 +33,11 @@
 
 检查（每次都做，打印到 stdout）：标题、表格、图片数量；表格行的列数与表头不一致的；图下是否注明"数据与可编辑图表"；
 标题编号（只检查不改写：一级"一、"连续、二级"1.1　"父级前缀与序号连续且后接全角空格、三级"1.1.1"，附录"附一、"连续；
-报错号、跳号、重号、缺编号、缺全角空格）；表头单位（半角括号、数值列表头缺单位）。生成 .docx 后读回逐项核对格式
+报错号、跳号、重号、缺编号、缺全角空格）；表头单位（半角括号、数值列表头缺单位）；卷首与文末（只检查不改写：报告标题与
+"一页摘要"之间有一个以上的段落、表格或列表，或有一段像元信息——含"数据截至""不构成投资建议""口径："或用"·"串起
+日期、作者、版本——报"卷首含元信息"；一页摘要之前出现修订说明或其他一节也报；文末最后一个一级板块不是"附：口径与说明"
+（修订版只允许修订说明排在它后面）也提示）；图号与文件名（只检查不改写：图注"图 N"按出现顺序 1、2、3……严格递增，
+图片文件名里的 figN 与图号一致，正文引用的"图 N"不超过图总数）。生成 .docx 后读回逐项核对格式
 （页面、页眉页脚、字体字号行距、标题、注释、目录域与分页、表格底色边框内边距对齐合计行列宽），打印"格式检查：x/y 通过"。
 .md 里的图片文件不存在时列出并以非零码退出（不输出 docx）；格式检查有不通过项时退出码 1。
 
@@ -1124,6 +1128,91 @@ def slim(doc):
 
 
 # ---------------------------------------------------------------- 检查
+RE_META = re.compile(r"数据截至|不构成投资建议|^口径[:：]|^\S.*·.*·")
+
+
+def check_front_back(blocks, heads):
+    """格式规范第 2 节：标题后直接进一页摘要；日期、作者、版本、数据截至、口径与免责声明放文末"附：口径与说明"，
+    修订版的修订说明表排在它之后、作为最后一节。只检查不改写。"""
+    issues = []
+    is_rev = lambda h: "修订说明" in h["text"] or "修订记录" in h["text"]
+    h1 = [h for h in heads if h["level"] == 1]
+    summary = next((h for h in h1 if "摘要" in h["text"]), None)
+    title = next((h for h in heads if h["level"] == 0), None)
+    if summary:
+        start = title["idx"] + 1 if title and title["idx"] < summary["idx"] else 0
+        front_h = [h for h in heads if start <= h["idx"] < summary["idx"] and h["level"] >= 1]
+        front = [b for b in blocks[start:summary["idx"]] if b[0] != "h"]
+        meta = [b for b in front if b[0] in ("p", "quote") and RE_META.search(plain(b[1]))]
+        if len(front) > 1 or meta:
+            first = plain(front[0][1]) if front[0][0] in ("p", "quote") else front[0][0]
+            issues.append(f"卷首含元信息，应移至文末'附：口径与说明'（标题与一页摘要之间 {len(front)} 段，"
+                          f"首段「{first[:30]}」）")
+        for h in front_h:
+            if is_rev(h):
+                issues.append(f"'{h['text']}'在一页摘要之前，应移至文末、排在'附：口径与说明'之后")
+            else:
+                issues.append(f"标题与一页摘要之间有一节'{h['text']}'，标题后应直接进一页摘要")
+    after = [h for h in h1 if not summary or h["idx"] > summary["idx"]]
+    n_rev = 0
+    while after and is_rev(after[-1]):
+        after.pop()
+        n_rev += 1
+    for h in after:
+        if is_rev(h):
+            issues.append(f"'{h['text']}'应排在'附：口径与说明'之后、作为最后一节")
+    tail = [h for h in h1 if "口径与说明" in h["text"]]
+    if not tail:
+        issues.append("文末没有以'口径与说明'为题的一节（附录最后放'附：口径与说明'：日期、作者、版本、数据截至、"
+                      "口径与免责声明；修订版的修订说明表排在它之后）")
+    elif not after or after[-1] is not tail[-1]:
+        last = after[-1]["text"] if after else "无"
+        issues.append(f"'{tail[-1]['text']}'应为最后一节，只有修订说明可以排在它后面（现在它后面是'{last}'）")
+    return issues
+
+
+RE_FIG_NO = re.compile(r"^\s*图\s*(\d+)")
+RE_FIG_FILE = re.compile(r"fig0*(\d+)", re.I)
+RE_FIG_REF = re.compile(r"图\s?(\d+)")
+
+
+def check_figures(blocks):
+    """格式规范第 7 节：图号按正文出现顺序编（第一张是图 1），图片文件名 figN 与图号一致；正文引用的图 N 不超过图总数。
+    只检查不改写。返回 (图片数, 问题列表)。"""
+    issues, k = [], 0
+    for b in blocks:
+        if b[0] != "img":
+            continue
+        k += 1
+        alt, path = plain(b[1]["alt"]), b[1]["path"]
+        m = RE_FIG_NO.match(alt)
+        fm = RE_FIG_FILE.search(os.path.basename(path))
+        if not m:
+            issues.append(f"第 {k} 张图（{os.path.basename(path)}）的图注没有写'图 {k}'")
+        elif int(m.group(1)) != k:
+            issues.append(f"第 {k} 张图标为'图 {m.group(1)}'：图号应按出现顺序编，这里应为图 {k}")
+        n = int(m.group(1)) if m else k
+        if not fm:
+            issues.append(f"图 {n} 的文件名 {os.path.basename(path)} 没有 fig{n}：文件名 figN 应与图号一致")
+        elif int(fm.group(1)) != n:
+            issues.append(f"图注'图 {n}'与文件名 fig{fm.group(1)}（{os.path.basename(path)}）不一致")
+    refs = set()
+    for b in blocks:
+        if b[0] in ("p", "quote"):
+            texts = [b[1]]
+        elif b[0] in ("ul", "ol"):
+            texts = [b[1][1]]
+        elif b[0] == "table":
+            texts = list(b[1]["head"]) + [c for _, r in b[1]["rows"] for c in r]
+        else:
+            continue
+        for t in texts:
+            refs.update(int(x) for x in RE_FIG_REF.findall(plain(t)))
+    for n in sorted(x for x in refs if x > k or x == 0):
+        issues.append(f"正文引用了'图 {n}'，但全文只有 {k} 张图")
+    return k, issues
+
+
 def check(blocks, img_root):
     heads, title_mode = outline(blocks)
     tables = [b for b in blocks if b[0] == "table"]
@@ -1154,7 +1243,8 @@ def check(blocks, img_root):
     num_issues, ncount = check_numbering(heads)
     return {"heads": len(heads), "lv": lv, "tables": len(tables), "imgs": len(imgs), "missing": missing,
             "bad_rows": bad_rows, "no_src": no_src, "title_mode": title_mode, "outline": heads,
-            "num_issues": num_issues, "ncount": ncount, "unit_issues": unit_issues}
+            "num_issues": num_issues, "ncount": ncount, "unit_issues": unit_issues,
+            "fb_issues": check_front_back(blocks, heads), "fig_issues": check_figures(blocks)[1]}
 
 
 def verify_docx(path, expect):
@@ -1333,6 +1423,9 @@ def main(argv=None):
     for x in r["num_issues"]:
         print(f"  - {x}")
     print(f"表头单位：问题 {len(r['unit_issues'])} 处" + "".join(f"\n  - {x}" for x in r["unit_issues"]))
+    print(f"卷首与文末（只检查不改写）：问题 {len(r['fb_issues'])} 处" + "".join(f"\n  - {x}" for x in r["fb_issues"]))
+    print(f"图号与文件名（只检查不改写）：图片 {r['imgs']} 张；问题 {len(r['fig_issues'])} 处"
+          + "".join(f"\n  - {x}" for x in r["fig_issues"]))
     if r["missing"]:
         print(f"错误：{len(r['missing'])} 张图片文件不存在（图片根目录 {img_root}）：", file=sys.stderr)
         for p in r["missing"]:

@@ -2613,7 +2613,8 @@ def export_png(xlsx, outdir, code=""):
             a.tick_params(which="both", labelsize=9)
         if any(g["kind"] == "barChart" for g in sp["groups"]):
             ax.axhline(0, color="#A6A6A6", linewidth=0.6)
-        ax.set_title(f"图 {sp['num']}  {sp['title']}" + (f"｜{code}" if code else ""), fontsize=10, loc="left",
+        # 图内不写图号："图 N"只出现在文档的图注里（格式规范第 7 节）；编号只用在文件名 图NN_….png 上
+        ax.set_title(sp["title"] + (f"｜{code}" if code else ""), fontsize=10, loc="left",
                      fontweight="bold")
         for a in (ax, ax2):
             if a is not None:
