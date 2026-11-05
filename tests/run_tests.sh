@@ -8,7 +8,7 @@
 #      --png 导出图表快照
 #   6) md2docx.py：合规示例 .md（报告外壳：标题 → 一页摘要 → 目录 → 一、结论与概述 → 各章 → 附：口径与说明；单位表头、
 #      合计行、现场生成的占位 PNG、注释）转 .docx，检查输出（含标题编号、报告外壳、出处标注、图下来源行、图号与文件名、
-#      格式规范 Part A 格式检查：中文 Arial / 英文数字 Noto Sans SC、行距 1.0、表格 9.5 pt、目录「　…　」）并读回核对；
+#      格式规范 Part A 格式检查：中文、英文与数字统一 Noto Sans SC、行距 1.0、表格 9.5 pt、目录「　…　」）并读回核对；
 #      缺一页摘要报出；不合规样例（卷首元信息、第一章不是结论与概述、正文带 [R23475 p5]、来源行带编号、
 #      取舍 / 来源 / 修订说明在正文）逐项报出
 #   7) check_delivery.py：用 rclone lsjson 样例 JSON（tests/fixtures/check_delivery_*.json）离线核对 Drive 布局、
@@ -139,7 +139,7 @@ assert mc.endswith("*" + vs.cell(row[2024], h["股数（亿股）"]).coordinate 
 # 格式规范 Part B（抽查；--check 第 9–12 项逐格比过）
 B = __import__("build_history_xlsx")
 nf = wb._named_styles["Normal"].font
-assert (nf.name, nf.sz) == ("Arial", 10), nf
+assert (nf.name, nf.sz) == ("Noto Sans SC", 10), nf
 for ws in wb.worksheets:
     assert ws.sheet_view.showGridLines is False and ws.freeze_panes == "B2", ws.title
     assert ws.sheet_properties.tabColor.rgb.endswith("17365D"), ws.title
@@ -315,7 +315,7 @@ assert widths[3] == max(widths), f"叙述列应吃剩余宽度：{widths}"
 assert len(d.inline_shapes) == 1 and d.inline_shapes[0].width <= 15 * 360000
 normal = d.styles["Normal"]
 rf = normal.element.rPr.rFonts
-assert rf.get(qn("w:ascii")) == "Noto Sans SC" and rf.get(qn("w:eastAsia")) == "Arial", "中文 Arial、英文与数字 Noto Sans SC 分设（V1.41）"
+assert rf.get(qn("w:ascii")) == "Noto Sans SC" and rf.get(qn("w:eastAsia")) == "Noto Sans SC", "中文、英文与数字统一 Noto Sans SC（0.17.0）"
 assert normal.font.size.pt == 10.5 and normal.paragraph_format.line_spacing == 1.0
 assert d.styles["表格表头"].font.size.pt == 9.5 and d.styles["表格正文"].font.size.pt == 9.5, "表格 9.5 pt"
 assert d.styles["toc 2"].paragraph_format.line_spacing == 1.25, "目录行距 1.25"

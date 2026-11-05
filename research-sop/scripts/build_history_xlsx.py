@@ -111,7 +111,7 @@ MAP_NAME = {"营收": "rev", "营业成本": "cogs", "毛利": "gp", "研发费�
             "总负债": "tl", "股东权益": "eq", "短期债务": "std", "长期债务": "ltd"}
 
 # ---- 格式（standards/格式规范.md Part B）
-LATIN_FONT, CJK_FONT, FONT_PT = "Arial", "Noto Sans SC", 10
+LATIN_FONT, CJK_FONT, FONT_PT = "Noto Sans SC", "Noto Sans SC", 10  # 格式规范 Part B：0.17.0 起中文、英文与数字统一 Noto Sans SC
 C_TITLE, C_SEC_BG, C_SEC_FG, C_HDR, C_BAND, C_NOTE = "17365D", "D9EAF7", "17365D", "1F4E78", "F7F9FB", "808080"
 C_INPUT, C_FORMULA, C_LINK, C_EXT, C_WHITE = "0000FF", "000000", "008000", "FF0000", "FFFFFF"
 TAB_COLOR = "17365D"
@@ -1281,7 +1281,7 @@ class Builder:
             ("最新季报（近12季度明细的最新一季）", f"{ex.label(lq)}，期末日 {ex.meta[lq]['end']}" if lq else "无季报"),
             ("报告类型编号", "7 = 全财年（年报）；1/2/3/4 = 财年第 1–4 季度的单季数（不是累计）；资产负债表为期末时点数。"),
             ("单位约定", f"金额 {self.U}（富途原值 ÷ 1e8）；股数亿股；股价美元；占比与同比 %；空白 ≠ 0（富途无数或输入缺数）；新旧分类不可相加。"),
-            ("格式", "按格式规范 Part B：默认 Arial 10 pt，含中文的单元格用 Noto Sans SC（一个单元格只能有一种字体，openpyxl 不能分设中西文字体）；"
+            ("格式", "按格式规范 Part B：中文、英文与数字统一 Noto Sans SC 10 pt；"
                    "字体颜色 蓝 = 手输常数、黑 = 本表公式、绿 = 跨表引用、红 = 外部工作簿；主标题 #17365D 白字、分区标题 #D9EAF7、列标题 #1F4E78 白字、"
                    "隔行 #F7F9FB、辅助说明灰字 #808080；金额 1 位小数、负数括号、零值短横线；隐藏网格线、冻结第 1 行与 A 列；"
                    "列宽 A 260 px、其余 100 px、长文本列 120 px（按 Google 表格的列宽换算写，Excel 里看会窄约 12%）；"
@@ -1439,7 +1439,7 @@ class Builder:
 
 # ---------------------------------------------------------------- 格式（格式规范 Part B）
 def set_default_font(wb):
-    """工作簿默认字体 Arial 10（Normal 样式与 0 号字体）。"""
+    """工作簿默认字体 Noto Sans SC 10（Normal 样式与 0 号字体）。"""
     f = Font(name=LATIN_FONT, sz=FONT_PT, family=2)
     wb._fonts = IndexedList([f])
     wb._named_styles["Normal"].font = f
@@ -1639,7 +1639,7 @@ def set_text_categories(ch, ref):
 
 
 def finish_chart(ch, title_text, ytitle=None, yfmt=None):
-    """格式规范第 13 节：白底、无边框、无阴影、无三维；标题 Arial 10 加粗左对齐；坐标轴与图例 9 pt、图例底部居中；
+    """格式规范第 13 节：白底、无边框、无阴影、无三维；标题 Noto Sans SC 10 加粗左对齐；坐标轴与图例 9 pt、图例底部居中；
     网格线 #D9D9D9（Excel / Google 表格里网格线总在数据后面）；系列按色板上色；折线无标记点、不平滑。"""
     from openpyxl.chart.marker import Marker
     ch.title = _rich_title(title_text, 1000, True, left=True)
@@ -2235,7 +2235,7 @@ def format_checks(xlsx, wb, ev):
             if px is None or (px != PX_ROW and px != PX_HEAD and px % PX_LINE not in (0, 2)):
                 bad.append(f"{ws.title} 第 {r} 行行高 {px}")
                 break
-    add("9 格式·工作表：默认 Arial 10、隐藏网格线、冻结第 1 行与 A 列、缩放 100%、标签色 #17365D、只有主标题行可合并、"
+    add("9 格式·工作表：默认 Noto Sans SC 10、隐藏网格线、冻结第 1 行与 A 列、缩放 100%、标签色 #17365D、只有主标题行可合并、"
         "列宽 A 260 / 其余 100 / 长文本 120 px、行高 20 / 28 / 22 px（换行按行数加高）", not bad,
         f"{len(wb.worksheets)} 张表；不符 {bad[:6] or '无'}")
     # 10 字体颜色：按单元格内容判定
@@ -2358,7 +2358,7 @@ def format_checks(xlsx, wb, ev):
             if any(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vals):
                 bad.append(f"{tag} 横轴标签是数值")
                 break
-    add("12 格式·图表：白底无边框无阴影无三维、标题 Arial 10 加粗左对齐、坐标轴与图例 9 pt、图例底部、网格线 #D9D9D9、"
+    add("12 格式·图表：白底无边框无阴影无三维、标题 Noto Sans SC 10 加粗左对齐、坐标轴与图例 9 pt、图例底部、网格线 #D9D9D9、"
         "系列色板；可读性：≤ 3 个系列、文本类别横轴、折线无标记点", not bad and parts,
         f"图表 {len(parts)} 张；不符 {sorted(set(bad))[:6] or '无'}")
     return res
@@ -2521,11 +2521,12 @@ def export_png(xlsx, outdir, code=""):
         print("未装 matplotlib，跳过 PNG 导出（python3 -m pip install --user matplotlib）")
         return None
     font, latin = _pick_cjk_font(fm), _pick_latin_font(fm)
-    plt.rcParams["font.family"] = [x for x in (latin, font) if x] + ["DejaVu Sans"]
+    # 0.17.0：中文、英文与数字统一 Noto Sans SC（Noto 自带西文数字字形）；Arial 系只在没有 Noto 时兜底
+    plt.rcParams["font.family"] = [x for x in (font, latin) if x] + ["DejaVu Sans"]
     if not font:
         print("警告：没找到 Noto Sans CJK / Noto Sans SC / WenQuanYi 中文字体，退回 DejaVu Sans，图中中文可能显示为方框")
     if not latin:
-        print("提醒：没找到 Arial（或字宽相同的 Liberation Sans / Arimo），西文数字用 DejaVu Sans")
+        print("提醒：没找到兜底西文字体 Arial / Liberation Sans / Arimo（有 Noto 时不影响出图）")
     plt.rcParams["axes.unicode_minus"] = False
     plt.rcParams["figure.facecolor"] = plt.rcParams["axes.facecolor"] = plt.rcParams["savefig.facecolor"] = "white"
     os.makedirs(outdir, exist_ok=True)
