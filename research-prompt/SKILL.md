@@ -7,7 +7,7 @@ description: 写提示词（研究立项）：读 Bill 一句话，盘料、和�
 
 **分工**：本技能只管立项——研究什么、从哪些角度、分几篇、每篇讲什么，写成一份任务书。执行方按 research-sop 做：怎么研究、怎么写、怎么检查、怎么交付，都在 research-sop 里，任务书只引用，不复述。
 
-版本：0.2.0（版本记录见仓库根目录 `CHANGELOG.md` 的"research-prompt"条目）。
+版本：0.2.1（版本记录见仓库根目录 `CHANGELOG.md` 的"research-prompt"条目）。
 
 **任务书模板库在 Google Drive**：`百万美金研究库/90_任务书模板库/`（文件夹链接 https://drive.google.com/drive/folders/1xywBBnlCm3Yt0Yxq0WPWqXUpmv7-KT5R ）。每次用之前先查 Drive 这个文件夹的当前内容（Drive 连接器或 rclone 列出文件夹），以 Drive 为准；文件名、篇数会变，不记具体文件。本仓库的 `模板库_已弃用/` 是搬迁时的旧副本，已被取代，只读参考，不当正本读，也不往里写。
 
