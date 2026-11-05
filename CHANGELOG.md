@@ -7,10 +7,11 @@
 1. 全仓库（含本 CHANGELOG 与 LESSONS 的历史条目、测试样例）把个人称呼统一换成"用户"；"Bill 格式规范""Bill 提供的"改为"用户提供的格式规范""用户提供的"；research-prompt 里指代用户的"他"一并改为"用户"。GitHub 账号名 `Bill-Zzz`（仓库地址、LICENSE）不动。
 2. 本地数据导出位置去掉个人电脑路径：research-sop `SKILL.md`"本地数据导出在哪"、`templates/financial_history_spec.md`、`scripts/build_history_xlsx.py` 来源页说明，由"Mac 上的 `~/futu_export/`、Drive `计算机 › 我的 Mac › futu_export`"改为"用户自己导出的 `futu_export/` 目录（本地或同步到 Drive）"。
 3. 删除 `research-sop/prompts/` 里三份 2026-11-02 的个人任务提示词包（科技 29 家、半导体周期主题、第一轮修订），`prompts/README.md` 同步；需要时见 git 历史。
-4. 新增 `gowork/SKILL.md`：开工规矩（先复述五项再动手、先问后答减法优先、按模型分工、子 Agent 任务书与收尾、环境）。去掉"私用"一句，称呼与本机路径通用化。README 补目录与安装方式。
+4. Drive 根文件夹不写死：research-prompt、check_delivery.py 用法示例、转换后修补清单、README 里的 `百万美金研究库/` 改为 `<研究库>/`（用户 Drive 里放研究的根文件夹，名字以 Drive 入口文件为准）；research-prompt `SKILL.md` 删去个人 Drive 文件夹链接；测试第 8 项改查 `<研究库>/90_任务书模板库/`，并禁止 SKILL.md 与任务书模板出现任何 Drive 链接或文件 ID。
+5. 新增 `gowork/SKILL.md`：开工规矩（先复述五项再动手、先问后答减法优先、按模型分工、子 Agent 任务书与收尾、环境）。去掉"私用"一句，称呼与本机路径通用化。README 补目录与安装方式。
 
 ## research-prompt 0.2.3 — 2026-11-05：去个人化
-随 research-sop 0.19.1：`SKILL.md`、`templates/任务书模板.md`、`模板库_已弃用/README.md` 的个人称呼改为"用户"。流程不变。
+随 research-sop 0.19.1：`SKILL.md`、`templates/任务书模板.md`、`模板库_已弃用/README.md` 的个人称呼改为"用户"；Drive 根文件夹写成 `<研究库>/`，删去个人 Drive 文件夹链接。流程不变。
 
 ## 0.19.0 — 2026-11-05：研究报告图表工作簿结构——图表总览看板 + 语义页 + 来源页 + 图表计算
 起因：研究报告配套的图表工作簿一直按"图N数据"一图一页做，"图表总览"只是图号索引表，没有图；公司历史数据工作簿早已按 AMZN 样板做成"图表总览看板 + 语义页 + 来源页 + 图表计算"。用户拍板把研究报告图表工作簿收进同一套原则（"图表工作簿规范"）。用新检查只读试跑两份现成表格：样板《AMZN 历史数据与图表》零问题通过；《半导体周期》V4.3 图表数据报出编号页名 18 张、总览无原生图表、无图表计算页、无来源页四处（下一步重排，本版未改）。

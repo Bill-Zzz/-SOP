@@ -2,7 +2,7 @@
 """交付核对：上传到 Google Drive 的工作区任务文件夹是否按"工作区任务文件夹布局与交付清单"摆放、命名、转格式。
 
 用法：
-  python3 check_delivery.py --drive "gdrive:百万美金研究库/10_工作区/YYYYMMDD_任务名" [--local 本地任务文件夹]
+  python3 check_delivery.py --drive "gdrive:<研究库>/10_工作区/YYYYMMDD_任务名" [--local 本地任务文件夹]
   python3 check_delivery.py --lsjson 已保存的lsjson.json [--local 本地任务文件夹]     离线核对（测试用）
   第 12 项（目录页码）可另加：--report 报告名（可多次） --toc-text 导出文本目录 --toc-evidence 人工确认文件
   第 13 项（图表工作簿结构）可另加：--workbook 工作簿名（可多次） --workbook-dir 导出 xlsx 的目录（离线）
@@ -547,7 +547,7 @@ def main(argv=None):
         description="交付核对：Drive 工作区任务文件夹的布局、命名、格式（及本地 成品/、留痕/ 是否齐）。"
                     "全部通过退出码 0，有不通过 1，出错 2。结果粘进自检。")
     src = ap.add_mutually_exclusive_group(required=True)
-    src.add_argument("--drive", help='rclone 路径，如 "gdrive:百万美金研究库/10_工作区/20261104_任务名"')
+    src.add_argument("--drive", help='rclone 路径，如 "gdrive:<研究库>/10_工作区/20261104_任务名"')
     src.add_argument("--lsjson", help="离线：读已保存的 rclone lsjson -R -M 输出（JSON 文件）")
     ap.add_argument("--local", help="本地任务文件夹（可选）：另查 成品/ 与 留痕/复用、复核 是否齐")
     ap.add_argument("--report", action="append", default=[],

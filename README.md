@@ -40,7 +40,7 @@ research-sop/           第二个 skill：Research SOP，主题·行业·公司�
   standards/            格式规范（并入用户提供的格式规范 V1.41）、存储规范、转换后修补清单、审稿清单（执行 AI 机械检查自查用；内容由用户审）
   templates/            报告外壳模板 report_shell.md（标题 → 一页摘要 → 目录 → 一、结论与概述 → 任务书定的各章 → 附：口径与说明）；数字台账、来源清单、自检、结论卡等留档模板
   prompts/              可直接发给其他 AI 的提示词包（公司清单、主题报告）
-research-prompt/        第三个 skill：写提示词（研究立项）——盘料、和用户谈出角度、出任务书；任务书定内容，research-sop 定格式和流程（templates/任务书模板.md；任务书模板库以 Google Drive 百万美金研究库/90_任务书模板库/ 为准，本地 模板库_已弃用/ 只读不再更新）
+research-prompt/        第三个 skill：写提示词（研究立项）——盘料、和用户谈出角度、出任务书；任务书定内容，research-sop 定格式和流程（templates/任务书模板.md；任务书模板库以 Google Drive <研究库>/90_任务书模板库/ 为准，本地 模板库_已弃用/ 只读不再更新）
 gowork/                 第四个 skill：开工规矩——先复述五项确认再动手、先问后答减法优先、按模型分工、子 Agent 任务书与收尾
 company-dossier/        旧目录占位，只有 README.md：说明已更名为 research-sop 及新脚本地址
 ```
