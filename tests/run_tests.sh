@@ -16,7 +16,8 @@
 #   7) check_delivery.py：用 rclone lsjson 样例 JSON（tests/fixtures/check_delivery_*.json）离线核对 Drive 布局、
 #      命名、格式，并核对本地 成品/、留痕/复用、复核；第 12 项 Google 文档目录二级条目带页码用导出文本样例
 #      （tests/fixtures/toc_good、toc_missing）与人工确认样例（toc_evidence_*.txt）测硬门槛；第 13 项图表工作簿结构
-#      （格式规范第 13.1 节）用 tests/make_workbook_fixture.py 现场生成的合规 / 不合规 xlsx 测硬门槛；不联网
+#      （格式规范第 13.1 节）用 tests/make_workbook_fixture.py 现场生成的合规 / 不合规 xlsx 测硬门槛；第 13 项版面
+#      （图表行区间不相交、行数不超出内容 + 50）由 tests/test_chart_layout.py 用现场生成的小工作簿测；不联网
 #   8) research-prompt：SKILL.md 有 frontmatter name、任务书模板在；任务书模板库指向 Drive <研究库>/90_任务书模板库/、
 #      先查 Drive，本地不留模板库副本；SKILL.md 与任务书模板不硬编码文件 ID、不含题型内容；
 #      任务书第七节有“要读的角度”，research-sop 有 D1 文献检索、D2 角度清单（SKILL.md 与 PROMPT.md）；
@@ -172,10 +173,15 @@ EOF
 python3 - "$TMP"/hist/*_ACME_历史数据_v1_测试.xlsx <<'EOF'
 import sys; sys.path.insert(0, "research-sop/scripts")
 import check_delivery
-bad, note = check_delivery.workbook_problems(check_delivery.parse_workbook(open(sys.argv[1], "rb").read()))
+sheets = check_delivery.parse_workbook(open(sys.argv[1], "rb").read())
+bad, note = check_delivery.workbook_problems(sheets)
 assert not bad, bad
-print("历史数据 Excel 符合格式规范第 13.1 节图表工作簿结构（语义页名、图表总览看板、图表计算、来源页）：" + note)
+ov = sheets[0]["anchors"]
+assert len(ov) == 13 and all(a["top"] == 4 + 21 * i for i, a in enumerate(ov)), [a["top"] for a in ov]
+print("历史数据 Excel 符合格式规范第 13.1 节图表工作簿结构（语义页名、图表总览看板、图表计算、来源页）：" + note
+      + "；图表总览 13 张图单列纵向 A5、A26……A257，互不重叠")
 EOF
+grep -q "转换为 Google 表格后按修补清单 S6 裁行裁列（行 × 列）：图表总览 279×8" "$TMP/hist.txt"
 if python3 -c "import matplotlib" 2>/dev/null; then
   python3 research-sop/scripts/build_history_xlsx.py ACME --root "$TMP/futu" --check-only "$TMP"/hist/*_ACME_历史数据_v1_测试.xlsx \
     --png "$TMP/png" | tee "$TMP/png.txt"
@@ -407,10 +413,11 @@ mkdir -p "$TMP/task/成品" "$TMP/task/留痕/ACME/复用" "$TMP/task/留痕/ACM
 touch "$TMP/task/成品/ACME_库存周期研究_20261105_V1.0.md" "$TMP/task/留痕/ACME/复用/结论卡.md" \
   "$TMP/task/留痕/ACME/复用/来源清单.csv" "$TMP/task/留痕/ACME/复用/数字台账.csv" "$TMP/task/留痕/ACME/复核/自检.md"
 python3 tests/make_workbook_fixture.py "$TMP/wb" >/dev/null
+python3 tests/test_chart_layout.py "$TMP/layout"   # 第 13 项版面：图表不重叠、无多余空行（修补清单 S5、S6）
 python3 research-sop/scripts/check_delivery.py --lsjson tests/fixtures/check_delivery_good.json --local "$TMP/task" \
   --toc-text tests/fixtures/toc_good --workbook-dir "$TMP/wb/good" | tee "$TMP/cd_good.txt"
 grep -q "结果：16/16 通过" "$TMP/cd_good.txt"
-grep -q "13. 通过    图表工作簿：语义页名、图表总览看板、图表计算、来源页（硬性）（1 份；ACME_图表数据_20261105_V1.0：工作表 4 张，总览原生图表 2 张，全簿 3 张）" "$TMP/cd_good.txt"
+grep -q "13. 通过    图表工作簿：语义页名、图表总览看板、图表计算、来源页、图表不重叠、无多余空行（硬性）（1 份；ACME_图表数据_20261105_V1.0：工作表 4 张，总览原生图表 2 张，全簿 3 张）" "$TMP/cd_good.txt"
 grep -q "12. 通过    Google 文档目录：二级条目必须有页码（硬性）（2 份）" "$TMP/cd_good.txt"
 grep -q "Google 文档）（2 份）" "$TMP/cd_good.txt"
 grep -q "PNG 只在 底稿/图片/ 下（2 张）" "$TMP/cd_good.txt"
@@ -421,7 +428,7 @@ if python3 research-sop/scripts/check_delivery.py --lsjson tests/fixtures/check_
   echo "不合规的交付应以非零码退出"; exit 1
 fi
 cat "$TMP/cd_bad.txt"
-for s in "结果：3/16 通过" "13. 通过    图表工作簿：语义页名、图表总览看板、图表计算、来源页（硬性）（没有配套图表工作簿，不适用）" "      - 20261105_库存周期_v1_ClaudeCode" \
+for s in "结果：3/16 通过" "13. 通过    图表工作簿：语义页名、图表总览看板、图表计算、来源页、图表不重叠、无多余空行（硬性）（没有配套图表工作簿，不适用）" "      - 20261105_库存周期_v1_ClaudeCode" \
     "ACME_库存周期研究_20261105_v1：取不到文档文本，也没有 --toc-evidence 人工确认（缺证据不通过）" "      - ACME_库存周期研究_20261105_v1" \
     "ACME_图表数据_20261105_V1.0.xlsx：xlsx 原件" "      - 报告/" "底稿/ACME/ 缺 自检" \
     "底稿/ACME/结论卡.md：结论卡应为 Google 文档，现为 md 原件" "底稿/ACME/数字台账.csv：数字台账应为 Google 表格，现为 csv 原件" \
@@ -466,7 +473,7 @@ WB="python3 research-sop/scripts/check_delivery.py --lsjson tests/fixtures/check
 wb_fail() {  # 用法：wb_fail 期望输出 -- 额外参数…
   local want="$1"; shift 2
   if $WB "$@" > "$TMP/cd_wb.txt"; then echo "图表工作簿不合规应以非零码退出：$*"; exit 1; fi
-  grep -q "13. 不通过  图表工作簿：语义页名、图表总览看板、图表计算、来源页（硬性）" "$TMP/cd_wb.txt" \
+  grep -q "13. 不通过  图表工作簿：语义页名、图表总览看板、图表计算、来源页、图表不重叠、无多余空行（硬性）" "$TMP/cd_wb.txt" \
     || { echo "第 13 项应不通过：$*"; cat "$TMP/cd_wb.txt"; exit 1; }
   grep -qF -- "$want" "$TMP/cd_wb.txt" || { echo "缺少预期输出：$want"; cat "$TMP/cd_wb.txt"; exit 1; }
 }
@@ -478,10 +485,12 @@ for want in "ACME_图表数据_20261105_V1.0：编号或默认页名 3 张（图
 done
 wb_fail "ACME_图表数据_20261105_V1.0：“图表总览”的图表引用了 历年营收与业务拆分——总览图的数据区放在名含“计算”的工作表" -- \
   --workbook-dir "$TMP/wb/bad_ref"
+wb_fail "ACME_图表数据_20261105_V1.0：“图表总览”：第 1 张图表“营收”（第 3–17 行）与第 2 张图表“营收”（第 3–17 行）行区间相交" -- \
+  --workbook-dir "$TMP/wb/bad_layout"
 wb_fail "ACME_图表数据_20261105_V1.0：取不到工作簿（--drive 时用 rclone 导出 xlsx；离线用 --workbook-dir）" --
 wb_fail "--workbook 指定的「不存在的表格」不在根目录的 Google 表格里" -- --workbook-dir "$TMP/wb/good" --workbook 不存在的表格
 $WB --report 半导体_存储周期研究_20261105 > "$TMP/cd_wb.txt"   # 该研究对象没有配套表格：不适用，通过
-grep -q "13. 通过    图表工作簿：语义页名、图表总览看板、图表计算、来源页（硬性）（没有配套图表工作簿，不适用）" "$TMP/cd_wb.txt"
+grep -q "13. 通过    图表工作簿：语义页名、图表总览看板、图表计算、来源页、图表不重叠、无多余空行（硬性）（没有配套图表工作簿，不适用）" "$TMP/cd_wb.txt"
 $WB --report ACME_库存周期研究_20261105_V1.0 --workbook-dir "$TMP/wb/good" > "$TMP/cd_wb.txt"   # 同研究对象、同版本号的表格被挑中
 grep -q "（1 份；ACME_图表数据_20261105_V1.0：" "$TMP/cd_wb.txt"
 for f in research-sop/standards/格式规范.md research-sop/SKILL.md research-sop/PROMPT.md research-sop/templates/financial_history_spec.md; do
@@ -496,7 +505,7 @@ grep -q "⑫ （硬性）图表工作簿结构" research-sop/templates/trail_sel
 if grep -n "审稿清单.md\` 十一条\|十一条机械检查" research-sop/SKILL.md research-sop/PROMPT.md research-sop/templates/trail_selfcheck.md research-prompt/templates/任务书模板.md; then
   echo "审稿清单已是十二条，不得再写十一条"; exit 1
 fi
-echo "check_delivery 第 13 项：合规图表工作簿通过；编号页名、总览不在第一张、总览无原生图表、无图表计算页、无来源页、总览图引用语义页、取不到工作簿、--workbook 不存在都不通过且退出码 1；没有配套表格记不适用；--report 按研究对象与版本号挑表格；格式规范 13.1（WB02 硬、WB04 软）、审稿清单 ⑫、自检模板与计数同步"
+echo "check_delivery 第 13 项：合规图表工作簿通过；编号页名、总览不在第一张、总览无原生图表、无图表计算页、无来源页、总览图引用语义页、总览图并排重叠、取不到工作簿、--workbook 不存在都不通过且退出码 1；没有配套表格记不适用；--report 按研究对象与版本号挑表格；格式规范 13.1（WB02 硬、WB04 软）、审稿清单 ⑫、自检模板与计数同步"
 
 echo "== 8. research-prompt =="
 grep -q "^name: research-prompt$" research-prompt/SKILL.md

@@ -37,6 +37,10 @@ Drive 检查项（布局见 Drive 入口文件；命名按 standards/存储规�
      后逐份查：工作表用语义名，没有"图1数据""Chart 2 Data""Sheet1"这类编号或默认页名；第一张可见工作表是"图表总览"，
      上面有原生图表（只有图号索引、没有图表不算看板），总览图表的数据引用指向名含"计算"的工作表；有名含"计算"的
      工作表（如"图表计算"）；有名含"来源"的来源页。取不到工作簿即不通过。
+     另查版面（转换后修补清单 S5、S6）：每张工作表读 drawing 锚点（twoCellAnchor 的 from/to；oneCellAnchor 的 from + ext
+     高，按该表行高换算，没写行高按 Google 默认 21 px），任意两张图（原生图表或图片）的行区间相交即不通过，打印相交的
+     两张图与各自行区间；每张工作表的行数（<dimension> 末行与 <row> 的较大者）超过"最后有内容的行或最后图底边 + 50"
+     即不通过（Google 表格默认每页 1000 行，转换后须裁到内容区 + 5 行）。
      核对哪几份：给了 --workbook 只查这几份；否则给了 --report 时，查与报告同一研究对象、版本号相同或不带版本号的
      图表数据 / 历史数据表格；都没给时查根目录全部这类表格。一份都没有时记"不适用"（报告没有配套图表工作簿）。
      来源 ID 能否追到、报告每张数据图在总览上有没有对应原生图，脚本查不了，由审稿清单 ⑫ 人工查。
@@ -52,6 +56,7 @@ Drive 检查项（布局见 Drive 入口文件；命名按 standards/存储规�
 import argparse
 import io
 import json
+import math
 import os
 import posixpath
 import re
@@ -91,6 +96,10 @@ WB_KEYS = ("图表数据", "历史数据")
 WB_OVERVIEW, WB_CALC, WB_SOURCE = "图表总览", "计算", "来源"
 WB_NUMBERED_RE = re.compile(r"^\s*(?:图表?|表|fig(?:ure)?\.?|chart|sheet|工作表)\s*[0-9０-９]+", re.I)
 WB_VERSION_RE = re.compile(r"_V\d+\.\d+$")
+WB_ROW_PT = 15.75        # 没写行高时按 Google 表格默认行高 21 px = 15.75 pt 换算图高
+EMU_PER_PT = 12700
+WB_EPS = 0.05            # 行区间相交的容差（行）：上一张底边正好贴着下一张顶边不算相交
+WB_SPARE_ROWS = 50       # 行数超过"最后有内容的行或最后图底边 + 50"即不通过（修补清单 S6 要求裁到 + 5）
 
 
 class Item:
@@ -364,8 +373,131 @@ def _ref_sheet(ref):
     return (m.group(1) or m.group(2)).replace("''", "'")
 
 
+def _local(el):
+    return el.tag.rsplit("}", 1)[-1]
+
+
+def _child(el, name):
+    return next((c for c in el if _local(c) == name), None)
+
+
+def _int(el, name, default=0):
+    c = _child(el, name) if el is not None else None
+    try:
+        return int(c.text) if c is not None and c.text else default
+    except ValueError:
+        return default
+
+
+def _sheet_rows(z, part):
+    """工作表 XML → (行高表 {行号(1 起): 磅}, 默认行高磅, 最大行号, 最后有内容的行号)。
+    最大行号取 <dimension> 末行与 <row r> 的较大者（Google 导出会把默认 1000 行都写成空 <row>）；
+    "有内容"= 单元格带值、公式或内联文本，只有样式的空单元格不算。"""
+    heights, default, max_row, last = {}, WB_ROW_PT, 0, 0
+    if part not in z.namelist():
+        return heights, default, max_row, last
+    for ev, el in ET.iterparse(io.BytesIO(z.read(part)), events=("end",)):
+        tag = _local(el)
+        if tag == "dimension":
+            m = re.search(r"(\d+)$", el.get("ref", ""))
+            if m:
+                max_row = max(max_row, int(m.group(1)))
+        elif tag == "sheetFormatPr":
+            try:
+                default = float(el.get("defaultRowHeight") or default)
+            except ValueError:
+                pass
+        elif tag == "row":
+            try:
+                r = int(el.get("r", "0"))
+            except ValueError:
+                continue
+            max_row = max(max_row, r)
+            if el.get("ht"):
+                try:
+                    heights[r] = float(el.get("ht"))
+                except ValueError:
+                    pass
+            if any(_local(c) == "c" and any(_local(x) in ("v", "f", "is") for x in c) for c in el):
+                last = max(last, r)
+            el.clear()
+    return heights, default, max_row, last
+
+
+def _emu_to_row(emu, heights, default):
+    """从第 1 行顶边往下 emu 处落在第几行（0 起、带小数）。"""
+    r, left = 0, emu
+    while True:
+        h = heights.get(r + 1, default) * EMU_PER_PT
+        if h <= 0:
+            r += 1
+            continue
+        if left < h or r > 100000:
+            return r + left / h
+        left -= h
+        r += 1
+
+
+def _row_to_emu(row, off, heights, default):
+    return sum(heights.get(i + 1, default) * EMU_PER_PT for i in range(row)) + off
+
+
+def _chart_title(z, chart):
+    try:
+        root = ET.fromstring(z.read(chart))
+    except (KeyError, ET.ParseError):
+        return ""
+    t = next((e for e in root.iter() if _local(e) == "title"), None)
+    if t is None:
+        return ""
+    return "".join(e.text or "" for e in t.iter() if _local(e) == "t").strip()
+
+
+def _anchors(z, drawing, heights, default):
+    """drawing XML → [{label, top, bottom}]：每张图（原生图表或图片）占的行区间（0 起、带小数，bottom 不含）。
+    twoCellAnchor 用 from/to；oneCellAnchor 用 from + ext 的高按行高换算；absoluteAnchor 用 pos + ext。"""
+    if drawing not in z.namelist():
+        return []
+    rels = _rels(z, drawing)
+    out = []
+    for a in ET.fromstring(z.read(drawing)):
+        kind = _local(a)
+        if kind not in ("twoCellAnchor", "oneCellAnchor", "absoluteAnchor"):
+            continue
+        label = "图片"
+        for e in a.iter():
+            if _local(e) == "chart" and e.get(REL_NS):
+                tgt = rels.get(e.get(REL_NS), ("", ""))[1]
+                ttl = _chart_title(z, tgt)
+                label = "图表" + (f"“{ttl}”" if ttl else "")
+                break
+        else:
+            if not any(_local(e) == "pic" for e in a.iter()):
+                continue
+        ext = _child(a, "ext")
+        cy = int(ext.get("cy", "0")) if ext is not None else 0
+        if kind == "twoCellAnchor":
+            f, t = _child(a, "from"), _child(a, "to")
+            top_emu = _row_to_emu(_int(f, "row"), _int(f, "rowOff"), heights, default)
+            bot_emu = _row_to_emu(_int(t, "row"), _int(t, "rowOff"), heights, default)
+        elif kind == "oneCellAnchor":
+            f = _child(a, "from")
+            top_emu = _row_to_emu(_int(f, "row"), _int(f, "rowOff"), heights, default)
+            bot_emu = top_emu + cy
+        else:
+            pos = _child(a, "pos")
+            top_emu = int(pos.get("y", "0")) if pos is not None else 0
+            bot_emu = top_emu + cy
+        out.append({"label": label, "top": _emu_to_row(top_emu, heights, default),
+                    "bottom": _emu_to_row(bot_emu, heights, default)})
+    for i, x in enumerate(out, start=1):
+        x["label"] = f"第 {i} 张{x['label']}"
+    return out
+
+
 def parse_workbook(data):
-    """xlsx 字节 → [{name, hidden, charts, refs}]，按工作簿里的顺序。只用标准库，读 Google 导出与 openpyxl 写出的 xlsx。"""
+    """xlsx 字节 → [{name, hidden, charts, refs, anchors, max_row, last_row}]，按工作簿里的顺序。
+    只用标准库，读 Google 导出与 openpyxl 写出的 xlsx。"""
     z = zipfile.ZipFile(io.BytesIO(data))
     wb_rels = _rels(z, "xl/workbook.xml")
     sheets = []
@@ -373,10 +505,12 @@ def parse_workbook(data):
         if not el.tag.endswith("}sheet"):
             continue
         part = wb_rels.get(el.get(REL_NS), ("", ""))[1]
-        charts, refs = 0, set()
+        heights, default, max_row, last = _sheet_rows(z, part)
+        charts, refs, anchors = 0, set(), []
         for typ, drawing in _rels(z, part).values():
             if typ != "drawing":
                 continue
+            anchors += _anchors(z, drawing, heights, default)
             for typ2, chart in _rels(z, drawing).values():
                 if typ2 != "chart" or chart not in z.namelist():
                     continue
@@ -387,8 +521,34 @@ def parse_workbook(data):
                         if sh:
                             refs.add(sh)
         sheets.append({"name": el.get("name", ""), "hidden": el.get("state", "visible") != "visible",
-                       "charts": charts, "refs": refs})
+                       "charts": charts, "refs": refs, "anchors": anchors, "max_row": max_row, "last_row": last})
     return sheets
+
+
+def _rows_text(a):
+    """行区间（0 起、bottom 不含）→ 1 起的"第 x–y 行"。"""
+    top = int(a["top"]) + 1
+    bot = max(top, math.ceil(a["bottom"] - 1e-6))
+    return f"第 {top}–{bot} 行"
+
+
+def layout_problems(sheets):
+    """图表互不重叠、页签无多余空行（转换后修补清单 S5、S6）。"""
+    bad = []
+    for s in sheets:
+        an = s.get("anchors", [])
+        for i in range(len(an)):
+            for j in range(i + 1, len(an)):
+                a, b = an[i], an[j]
+                if a["top"] < b["bottom"] - WB_EPS and b["top"] < a["bottom"] - WB_EPS:
+                    bad.append(f"“{s['name']}”：{a['label']}（{_rows_text(a)}）与{b['label']}（{_rows_text(b)}）"
+                               "行区间相交——图表单列纵向排布，按转换后修补清单 S5 重新摆")
+        bottom = max([math.ceil(a["bottom"] - 1e-6) for a in an] + [0])
+        used = max(s.get("last_row", 0), bottom)
+        if s.get("max_row", 0) > used + WB_SPARE_ROWS:
+            bad.append(f"“{s['name']}”：{s['max_row']} 行，内容与图只到第 {used} 行（超出 {WB_SPARE_ROWS} 行以上）"
+                       "——按转换后修补清单 S6 删到内容区 + 5 行")
+    return bad
 
 
 def workbook_problems(sheets):
@@ -415,6 +575,7 @@ def workbook_problems(sheets):
         bad.append(f"没有名含“{WB_CALC}”的工作表（如“图表计算”，放总览图的公式数据区，可隐藏）")
     if not any(WB_SOURCE in n for n in names):
         bad.append(f"没有名含“{WB_SOURCE}”的来源页（来源 ID → 文件、链接、页码或字段）")
+    bad += layout_problems(sheets)
     total = sum(s["charts"] for s in sheets)
     note = f"工作表 {len(sheets)} 张，总览原生图表 {ov['charts'] if ov else 0} 张，全簿 {total} 张"
     return bad, note
@@ -478,7 +639,7 @@ def check_workbooks(items, args):
         bad += [f"{w.name}：{x}" for x in probs]
         notes.append(f"{w.name}：{note}")
     ok_note = f"{len(wbs)} 份；" + "；".join(notes) if wbs else "没有配套图表工作簿，不适用"
-    return [("图表工作簿：语义页名、图表总览看板、图表计算、来源页（硬性）", bad, ok_note)]
+    return [("图表工作簿：语义页名、图表总览看板、图表计算、来源页、图表不重叠、无多余空行（硬性）", bad, ok_note)]
 
 
 def _has(dirpath, key):
