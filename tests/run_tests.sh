@@ -19,7 +19,8 @@
 #      （格式规范第 13.1 节）用 tests/make_workbook_fixture.py 现场生成的合规 / 不合规 xlsx 测硬门槛；不联网
 #   8) research-prompt：SKILL.md 有 frontmatter name、任务书模板在；任务书模板库指向 Drive <研究库>/90_任务书模板库/、
 #      先查 Drive，本地不留模板库副本；SKILL.md 与任务书模板不硬编码文件 ID、不含题型内容；
-#      任务书第七节有“要读的角度”，research-sop 有 D1 文献检索、D2 角度清单（SKILL.md 与 PROMPT.md）
+#      任务书第七节有“要读的角度”，research-sop 有 D1 文献检索、D2 角度清单（SKILL.md 与 PROMPT.md）；
+#      题型模板（公司档案、行业、主题）齐，research-sop 无“待迁入”标注（0.20.0 解耦）
 # 用法：bash tests/run_tests.sh   （在仓库根目录运行）
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -518,6 +519,17 @@ grep -q "要读的角度" research-prompt/templates/任务书模板.md || { echo
 grep -q "文献检索" research-sop/SKILL.md || { echo "research-sop SKILL.md 须有 D1“文献检索”"; exit 1; }
 grep -q "角度清单" research-sop/SKILL.md || { echo "research-sop SKILL.md 须有 D2“角度清单”"; exit 1; }
 grep -q "文献检索" research-sop/PROMPT.md || { echo "research-sop PROMPT.md 须同步“文献检索”"; exit 1; }
+for t in 题型_公司档案 题型_行业 题型_主题; do
+  test -s "research-prompt/templates/$t.md" || { echo "缺题型模板：research-prompt/templates/$t.md"; exit 1; }
+  grep -q "读者要能回答的问题" "research-prompt/templates/$t.md" && grep -q "自检加查项" "research-prompt/templates/$t.md" \
+    || { echo "$t.md 须有“读者要能回答的问题”与“自检加查项”"; exit 1; }
+done
+if grep -n "待迁入 research-prompt" research-sop/SKILL.md research-sop/PROMPT.md; then
+  echo "research-sop 0.20.0 起类型层已迁入题型模板，不应再有“待迁入”标注"; exit 1
+fi
+grep -q "第五节：股价行为画像与 σ 门槛" research-prompt/templates/题型_公司档案.md || { echo "公司档案题型模板须有第五节 σ 门槛"; exit 1; }
+if grep -n "^## 公司报告七节\|^### 第五节：股价行为画像" research-sop/SKILL.md; then echo "公司报告七节与 σ 门槛已迁到公司档案题型模板"; exit 1; fi
+echo "题型模板：公司档案、行业、主题三份齐，research-sop 无“待迁入”标注，七节与 σ 门槛只在公司档案模板"
 echo "research-prompt：frontmatter 与任务书模板齐；任务书第七节有“要读的角度”，research-sop 有文献检索与角度清单；模板库以 Drive <研究库>/90_任务书模板库/ 为准、先查 Drive，本地不留副本；SKILL.md 无文件 ID、无题型内容"
 echo
 if [ ${#SKIPPED[@]} -gt 0 ]; then
