@@ -33,7 +33,7 @@ research-sop/
   prompts/              发给执行 AI 的一句话提示词模板
 research-prompt/
   SKILL.md              立项方法
-  templates/            任务书模板（任务书模板库在 Google Drive，仓库不存副本）
+  templates/            任务书模板；题型模板 题型_公司档案 / 题型_行业 / 题型_主题（各类报告的章节、篇幅、图表分配、随类型变的口径与自检加查项）；通过的任务书入 Google Drive 任务书模板库，仓库不存副本
 gowork/SKILL.md         开工规矩
 tests/                  自检，GitHub Actions 每次推送自动运行
 ```
