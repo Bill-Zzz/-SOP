@@ -3,11 +3,12 @@
 
 用法：python3 tests/make_workbook_fixture.py <输出根目录>
 在 <输出根目录>/good、bad、bad_ref 下各写一份 ACME_图表数据_20261105_V1.0.xlsx：
-  good     合规：图表总览在第一张、2 张原生图表只引用"图表计算"；语义页"历年营收与业务拆分"带本页图；
+  good     合规：图表总览在第一张、2 张原生图表单列纵向排布（A3、A24）、只引用"图表计算"；语义页"历年营收与业务拆分"带本页图；
            "营收数据来源"；"图表计算"隐藏
   bad      不合规：第一张是"说明"；"图表总览"只有图号索引、没有图表；"图1数据""Chart 2 Data""Sheet1"编号或默认页名；
            没有来源页，也没有图表计算页
   bad_ref  总览图直接引用语义页而不是"图表计算"，其余合规
+  bad_layout 总览两张图并排（A3、J3），行区间相交，其余合规
 """
 import os
 import sys
@@ -41,7 +42,7 @@ def source_sheet(ws):
     ws.append(["S01", "ACME 10-K 2025", "https://example.com/10k", "第 45 页 合并利润表"])
 
 
-def good(path, overview_ref_semantic=False):
+def good(path, overview_ref_semantic=False, side_by_side=False):
     wb = Workbook()
     ov = wb.active
     ov.title = "图表总览"
@@ -55,7 +56,7 @@ def good(path, overview_ref_semantic=False):
     calc.sheet_state = "hidden"
     src = sem if overview_ref_semantic else calc
     chart_on(ov, src, "A3")
-    chart_on(ov, src, "J3", LineChart)
+    chart_on(ov, src, "J3" if side_by_side else "A24", LineChart)   # 单列纵向（0.21.0 起并排的图算重叠）
     wb.save(path)
 
 
@@ -75,12 +76,13 @@ def bad(path):
 
 def main():
     root = sys.argv[1]
-    for sub in ("good", "bad", "bad_ref"):
+    for sub in ("good", "bad", "bad_ref", "bad_layout"):
         os.makedirs(os.path.join(root, sub), exist_ok=True)
     good(os.path.join(root, "good", NAME))
     bad(os.path.join(root, "bad", NAME))
     good(os.path.join(root, "bad_ref", NAME), overview_ref_semantic=True)
-    print(f"图表工作簿样例：{root}/good、bad、bad_ref")
+    good(os.path.join(root, "bad_layout", NAME), side_by_side=True)
+    print(f"图表工作簿样例：{root}/good、bad、bad_ref、bad_layout")
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@
 import argparse
 import csv
 import datetime as dt
+import math
 import os
 import re
 import shutil
@@ -118,6 +119,17 @@ TAB_COLOR = "17365D"
 PX_A, PX_COL, PX_LONG = 260, 100, 120          # 列宽（像素）
 PX_ROW, PX_TITLE, PX_HEAD, PX_LINE = 20, 28, 22, 20  # 行高（像素）；PX_LINE = 换行后每行
 MAX_WRAP_LINES = 8                             # 长文本超过 8 行不换行（整段在单元格里，向右溢出）
+# ---- 图表总览版面（0.21.0）：单列纵向排布。旧版两列并排、锚点按 Excel 列宽算，转成 Google 表格后列宽变了
+# （A 列 260 px），左列的图被右列压住、右边截断。现在每张图固定 720 × 360 px，锚点都在同一列，上下排。
+CHART_W_PX, CHART_H_PX = 720, 360
+PX_PER_CM = 96 / 2.54                          # openpyxl 图表宽高单位是 cm；按 96 dpi：1 px = 2.54 / 96 cm
+CHART_W_CM, CHART_H_CM = CHART_W_PX / PX_PER_CM, CHART_H_PX / PX_PER_CM  # 720 px = 19.05 cm，360 px = 9.525 cm
+# 行距按 Google 表格的默认行高 21 px 算，不按 Excel：交付物是 Google 表格（D5"交付一律 Google 格式"），图在 Google 里
+# 怎么落行才算数；Excel / LibreOffice 的默认行高 20 px 更矮，按 21 px 算出的行距在那边只会更松、不会重叠。
+GSHEET_ROW_PX = 21
+CHART_GAP_ROWS = math.ceil(CHART_H_PX / GSHEET_ROW_PX) + 3   # 相邻两张图锚点行距 = ⌈360 / 21⌉ + 3 = 21 行
+CHART_COL, CHART_ROW0 = "A", 5                 # 第一张图锚在表头（第 1–3 行：标题、年份筛选、使用说明）下方的 A5
+TRIM_ROWS, TRIM_COLS = 5, 2                    # 转换后每页裁到"内容或图底边 + 5 行""最后有内容的列 + 2 列"（修补清单 S6）
 # 图表色板：主要、次要、对照（另有正向 #70AD47、负向 #C00000、预测 #ED7D31，历史数据表用不到）
 CHART_COLORS = ["17365D", "5B9BD5", "A6A6A6"]
 GRID_COLOR = "D9D9D9"
@@ -1254,8 +1266,7 @@ class Builder:
         pcats = Reference(calc, min_col=pc0, min_row=r0, max_row=r0 + 9)
         charts.append(bar("13 同行横向比较：营收（第二层，从行业报告填）", None, catref=pcats,
                           refs=data(["营收"], rowN=r0 + 9, idx=pidx)))
-        for i, ch in enumerate(charts):
-            anchor = f"{'A' if i % 2 == 0 else 'H'}{5 + (i // 2) * 18}"
+        for anchor, ch in zip(chart_anchors(len(charts)), charts):   # 单列纵向：A5、A26、A47……
             ov.add_chart(ch, anchor)
         self.expected_charts = len(charts)
 
@@ -1432,6 +1443,7 @@ class Builder:
         self.sheet_sources()
         for ws in self.wb.worksheets:
             format_sheet(ws)
+        self.trim = {ws.title: trim_target(ws) for ws in self.wb.worksheets}
         self.wb.calculation.fullCalcOnLoad = True
         self.wb.save(out_path)
         return out_path
@@ -1638,13 +1650,45 @@ def set_text_categories(ch, ref):
         s.cat = AxDataSource(strRef=StrRef(f=str(ref)))
 
 
+def chart_anchors(n, col=CHART_COL, row0=CHART_ROW0, gap=CHART_GAP_ROWS):
+    """n 张图的锚点：同一列，从 row0 起每隔 gap 行一张（A5、A26、A47……）。"""
+    return [f"{col}{row0 + i * gap}" for i in range(n)]
+
+
+def trim_target(ws):
+    """转换后这一页该裁到的 (行数, 列数)：最后有内容的行与最后一张图底边取大 + 5 行；
+    最后有内容的列与图右边所在列取大 + 2 列（图底边按 Google 行高 21 px、图右边按本页列宽算）。"""
+    rows = cols = 1
+    for row in ws.iter_rows():
+        for c in row:
+            if c.value is not None:
+                rows, cols = max(rows, c.row), max(cols, c.column)
+    for ch in ws._charts:
+        a = ch.anchor if isinstance(ch.anchor, str) else None
+        if not a:
+            continue
+        col = column_index_from_string(re.match(r"[A-Z]+", a).group(0))
+        row = int(re.search(r"\d+", a).group(0))
+        rows = max(rows, row - 1 + math.ceil(ch.height * PX_PER_CM / GSHEET_ROW_PX))
+        left, j = ch.width * PX_PER_CM, col
+        while True:
+            cd = ws.column_dimensions.get(get_column_letter(j))
+            w = width_to_px(cd.width) if cd is not None and cd.width else PX_COL
+            if left <= w:
+                break
+            left -= w
+            j += 1
+        cols = max(cols, j)
+    return rows + TRIM_ROWS, cols + TRIM_COLS
+
+
 def finish_chart(ch, title_text, ytitle=None, yfmt=None):
     """格式规范第 13 节：白底、无边框、无阴影、无三维；标题 Noto Sans SC 10 加粗左对齐；坐标轴与图例 9 pt、图例底部居中；
     网格线 #D9D9D9（Excel / Google 表格里网格线总在数据后面）；系列按色板上色；折线无标记点、不平滑。"""
     from openpyxl.chart.marker import Marker
     ch.title = _rich_title(title_text, 1000, True, left=True)
     ch.display_blanks = "gap"
-    ch.width, ch.height = 17, 8.5
+    ch.width, ch.height = CHART_W_CM, CHART_H_CM  # 固定 720 × 360 px
     ch.roundedCorners = False
     ch.graphical_properties = GraphicalProperties(solidFill="FFFFFF", ln=LineProperties(noFill=True))
     ch.plot_area.graphicalProperties = GraphicalProperties(noFill=True, ln=LineProperties(noFill=True))
@@ -2691,6 +2735,8 @@ def main(argv=None):
         path = b.build(os.path.join(a.out, name))
         nchart = b.expected_charts
         print(f"已生成 {path}（{len(ex.years)} 个财年，{len(b.events)} 个股价事件，{nchart} 张图）")
+        print("转换为 Google 表格后按修补清单 S6 裁行裁列（行 × 列）："
+              + "；".join(f"{k} {r}×{c}" for k, (r, c) in b.trim.items()))
     png_dir = None
     if a.png:
         if export_png(path, a.png, code) is not None:
