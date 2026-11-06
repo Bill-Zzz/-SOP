@@ -17,7 +17,7 @@
 #      命名、格式，并核对本地 成品/、留痕/复用、复核；第 12 项 Google 文档目录二级条目带页码用导出文本样例
 #      （tests/fixtures/toc_good、toc_missing）与人工确认样例（toc_evidence_*.txt）测硬门槛；第 13 项图表工作簿结构
 #      （格式规范第 13.1 节）用 tests/make_workbook_fixture.py 现场生成的合规 / 不合规 xlsx 测硬门槛；不联网
-#   8) research-prompt：SKILL.md 有 frontmatter name、任务书模板在；任务书模板库指向 Drive 百万美金研究库/90_任务书模板库/、
+#   8) research-prompt：SKILL.md 有 frontmatter name、任务书模板在；任务书模板库指向 Drive <研究库>/90_任务书模板库/、
 #      先查 Drive，本地 模板库_已弃用/ 标明弃用；SKILL.md 与任务书模板不硬编码文件 ID、不含题型内容
 # 用法：bash tests/run_tests.sh   （在仓库根目录运行）
 set -euo pipefail
@@ -501,18 +501,18 @@ grep -q "^name: research-prompt$" research-prompt/SKILL.md
 test -s research-prompt/templates/任务书模板.md || { echo "缺文件：research-prompt/templates/任务书模板.md"; exit 1; }
 if test -e research-prompt/模板库; then echo "本地 模板库/ 应已改名为 模板库_已弃用/（任务书模板库以 Drive 为准）"; exit 1; fi
 grep -q "已弃用" research-prompt/模板库_已弃用/README.md || { echo "模板库_已弃用/README.md 须标明已被 Drive 取代"; exit 1; }
-grep -q "百万美金研究库/90_任务书模板库/" research-prompt/SKILL.md || { echo "SKILL.md 须指向 Drive 百万美金研究库/90_任务书模板库/"; exit 1; }
+grep -q "<研究库>/90_任务书模板库/" research-prompt/SKILL.md || { echo "SKILL.md 须指向 Drive <研究库>/90_任务书模板库/"; exit 1; }
 grep -q "先查 Drive" research-prompt/SKILL.md || { echo "SKILL.md 须写明先查 Drive 当前内容"; exit 1; }
 if grep -n "从 \`模板库/\`\|模板库/README.md\|模板库/参考骨架.md" research-prompt/SKILL.md research-prompt/templates/任务书模板.md; then
   echo "SKILL.md 与任务书模板不得再把本地 模板库/ 当在用的库"; exit 1
 fi
-if grep -v "drive.google.com/drive/folders/" research-prompt/SKILL.md research-prompt/templates/任务书模板.md | grep -nE "[A-Za-z0-9_-]{25,}"; then
-  echo "SKILL.md 与任务书模板不得硬编码 Drive 文件 ID（入口只写文件夹路径与文件夹链接）"; exit 1
+if grep -nE "drive.google.com|[A-Za-z0-9_-]{25,}" research-prompt/SKILL.md research-prompt/templates/任务书模板.md; then
+  echo "SKILL.md 与任务书模板不得硬编码 Drive 链接或文件 ID（只写 <研究库>/ 下的文件夹路径）"; exit 1
 fi
 if grep -n "半导体\|周期" research-prompt/SKILL.md research-prompt/templates/任务书模板.md; then
   echo "research-prompt 的 SKILL.md 与任务书模板不得写题型内容（周期内容只放模板库）"; exit 1
 fi
-echo "research-prompt：frontmatter 与任务书模板齐；模板库以 Drive 百万美金研究库/90_任务书模板库/ 为准、先查 Drive，本地 模板库_已弃用/ 已标弃用；SKILL.md 无文件 ID、无题型内容"
+echo "research-prompt：frontmatter 与任务书模板齐；模板库以 Drive <研究库>/90_任务书模板库/ 为准、先查 Drive，本地 模板库_已弃用/ 已标弃用；SKILL.md 无文件 ID、无题型内容"
 echo
 if [ ${#SKIPPED[@]} -gt 0 ]; then
   echo "已通过，但以下测试被跳过："
