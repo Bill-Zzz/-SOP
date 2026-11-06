@@ -1,0 +1,1427 @@
+{
+  "meta": {
+    "name": "图表总览模板",
+    "version": "1.3",
+    "spec": "standards/Excel规范.md V1.5",
+    "sample": "1berhHOr675gohS4zlRpg6LMWuVD2Bqk7Ey9lUHX2qr0",
+    "note": "所有行列号为 1 起；Sheets API 调用时减 1。占位符：{CODE} 公司代码、{DATA} 语义页名（模板里叫 数据页）、{CALC_ID}/{OVERVIEW_ID} 为 sheetId。"
+  },
+  "palette": {
+    "series": [
+      {
+        "n": 1,
+        "tone": "dark",
+        "name": "藏青",
+        "hex": "#1E4FA3",
+        "role": "主要系列/最大业务"
+      },
+      {
+        "n": 2,
+        "tone": "light",
+        "name": "金",
+        "hex": "#F4C63A",
+        "role": "预测/待核/强调"
+      },
+      {
+        "n": 3,
+        "tone": "dark",
+        "name": "青绿",
+        "hex": "#1E8C7A",
+        "role": "正向"
+      },
+      {
+        "n": 4,
+        "tone": "light",
+        "name": "杏橙",
+        "hex": "#F2A35E",
+        "role": "扩展"
+      },
+      {
+        "n": 5,
+        "tone": "dark",
+        "name": "紫",
+        "hex": "#7C4DBF",
+        "role": "扩展"
+      },
+      {
+        "n": 6,
+        "tone": "light",
+        "name": "天蓝",
+        "hex": "#7FB5EA",
+        "role": "扩展"
+      },
+      {
+        "n": 7,
+        "tone": "dark",
+        "name": "砖红",
+        "hex": "#C83E2E",
+        "role": "负向"
+      },
+      {
+        "n": 8,
+        "tone": "light",
+        "name": "黄绿",
+        "hex": "#B7CB5A",
+        "role": "扩展"
+      },
+      {
+        "n": 9,
+        "tone": "dark",
+        "name": "石板蓝",
+        "hex": "#3F6B9A",
+        "role": "扩展"
+      },
+      {
+        "n": 10,
+        "tone": "light",
+        "name": "灰",
+        "hex": "#C4C9D1",
+        "role": "对照/基准/未拆分"
+      }
+    ],
+    "totalLine": "#1F2937",
+    "stackingRule": "业务按收入从大到小领序号 1,2,3…，从底往上堆；奇数深偶数浅；多线图对照系列用灰色虚线",
+    "page": {
+      "scope": "仅 图表总览 一页；其他工作表按格式规范 Part B",
+      "titleText": "#111827",
+      "blockTitleText": "#111827",
+      "controlBg": "#FFFFFF",
+      "controlBorder": "#D1D5DB",
+      "controlText": "#111827",
+      "controlLabelText": "#6B7280",
+      "sectionText": "#6B7280",
+      "noteText": "#6B7280",
+      "rule": "#E5E7EB",
+      "gridline": "#D9D9D9",
+      "dataHeaderBg": "#1F4E78",
+      "dataHeaderText": "#FFFFFF",
+      "tabColor": null,
+      "principle": "首页无填充色；只有图与系列标签有颜色"
+    }
+  },
+  "sheets": [
+    {
+      "title": "图表总览",
+      "index": 0,
+      "gridProperties": {
+        "hideGridlines": true,
+        "frozenRowCount": 0,
+        "frozenColumnCount": 0,
+        "columnCount": 16
+      },
+      "columnWidthsPx": {
+        "A": 100,
+        "B": 360,
+        "C-L": 100,
+        "M-P": 100
+      },
+      "rowHeightPx": {
+        "default": 24,
+        "row1": 32
+      },
+      "font": {
+        "family": "Noto Sans SC",
+        "size": 10
+      }
+    },
+    {
+      "title": "数据页",
+      "index": 1,
+      "gridProperties": {
+        "hideGridlines": true,
+        "frozenRowCount": 3,
+        "frozenColumnCount": 1
+      },
+      "columnWidthsPx": {
+        "A": 120,
+        "B": 90,
+        "C+": 110
+      },
+      "rows": {
+        "1": {
+          "A": "{CODE} 历年营收与业务拆分",
+          "style": "title14"
+        },
+        "2": {
+          "B": "金额：亿美元；占比/同比：%；空白≠0；半年行不进年份筛选；新旧分类不可相加。",
+          "style": "note10"
+        },
+        "3": {
+          "headers": [
+            "期间",
+            "期间口径",
+            "合并营收（亿美元）",
+            "合并同比（%）",
+            "业务1营收（亿美元）",
+            "业务1占比（%）",
+            "业务1同比（%）",
+            "…每业务三列…",
+            "未拆分收入营收（亿美元）",
+            "未拆分收入占比（%）",
+            "未拆分收入同比（%）",
+            "来源ID",
+            "勾稽差额（亿美元）",
+            "分类与同比说明"
+          ],
+          "style": "header"
+        }
+      },
+      "dataRows": "4..200；A 列文本：全年 1995 / 半年 2026H1；B 列：全年 / 半年",
+      "fontColorRule": "手输 #0000FF；本表公式 #000000；跨表 #008000"
+    },
+    {
+      "title": "近12季度明细",
+      "index": 2,
+      "note": "季度区的语义页，模板里叫 {QDATA}；A 列季度文本 2025Q3 升序，B 起为科目列（营收、同比、毛利率、营业利润率、净利率…）；其余规格同数据页"
+    },
+    {
+      "title": "图表计算",
+      "index": 3,
+      "hidden": true,
+      "gridProperties": {
+        "hideGridlines": true,
+        "columnCount": 120,
+        "rowCount": 120
+      },
+      "font": {
+        "family": "Noto Sans SC",
+        "size": 10,
+        "color": "#008000"
+      }
+    }
+  ],
+  "overview": {
+    "header": {
+      "A1": {
+        "value": "{CODE} 图表总览",
+        "merge": "A1:L1",
+        "style": "mainTitle"
+      },
+      "A2": {
+        "value": "起始年份",
+        "style": "label11"
+      },
+      "C2": {
+        "value": "结束年份",
+        "style": "label11"
+      },
+      "E2": {
+        "value": "使用方法",
+        "style": "label11"
+      },
+      "A3": {
+        "value": "<最早全年>",
+        "style": "control",
+        "validation": "yearRange"
+      },
+      "C3": {
+        "value": "<最新全年>",
+        "style": "control",
+        "validation": "yearRange"
+      },
+      "E3": {
+        "value": "年度区随页顶年份更新；季度区、市值区用各自控件；单期与事件区不受年份控制。",
+        "merge": "E3:L3",
+        "style": "label11"
+      }
+    },
+    "slotTypes": {
+      "W": {
+        "rows": 24,
+        "chart": {
+          "anchorCol": "C",
+          "widthPx": 1180,
+          "heightPx": 540
+        },
+        "maxToggles": 10,
+        "layout": {
+          "title": "r",
+          "blank": "r+1",
+          "toggles": "r+2 .. r+1+k",
+          "noteMerge": "A:B, 3 行, 从 r+3+k",
+          "sourceMerge": "A:B, 2 行, 从 r+6+k"
+        }
+      },
+      "S": {
+        "rows": 18,
+        "chart": {
+          "anchorCol": "C",
+          "widthPx": 590,
+          "heightPx": 384
+        },
+        "maxToggles": 7,
+        "right": {
+          "toggleCols": "I:J",
+          "chartAnchorCol": "K"
+        },
+        "layout": {
+          "title": "r",
+          "blank": "r+1",
+          "toggles": "r+2 .. r+1+k",
+          "noteMerge": "A:B 或 I:J, 3 行",
+          "sourceMerge": "2 行"
+        }
+      },
+      "C": {
+        "rows": 4,
+        "layout": {
+          "labels": "r: A 起始年份 / C 结束年份 / E 显示数据",
+          "controls": "r+1: A, C 年份下拉; E 显示数据下拉",
+          "blank": "r+2, r+3"
+        }
+      },
+      "D": {
+        "rows": 2,
+        "layout": {
+          "banner": "r: A:L 合并，文字 `<口径> · <控件说明>`，10 pt 加粗 #6B7280，无底色，行顶细线 #E5E7EB",
+          "blank": "r+1"
+        }
+      }
+    },
+    "slots": [
+      {
+        "id": 1,
+        "type": "D",
+        "startRow": 4,
+        "section": "Y",
+        "title": "年度 · 随页顶起始、结束年份更新"
+      },
+      {
+        "id": 2,
+        "type": "W",
+        "startRow": 6,
+        "section": "Y",
+        "title": "年度营收｜保留历史披露口径",
+        "chart": "combo_stacked",
+        "calcBlock": "REV",
+        "toggles": [
+          "合并总营收",
+          "早期总收入（未分业务）",
+          "旧分类1",
+          "旧分类2",
+          "旧分类3",
+          "业务1",
+          "业务2",
+          "业务3",
+          "业务4",
+          "业务5"
+        ],
+        "toggleRows": "A8:A17",
+        "note": "各口径适用期见名称；旧分类与现代分类不叠加；总额为折线；缺项不填 0，悬停可查。",
+        "source": "来源：{DATA}；合并与各业务营收，亿美元。"
+      },
+      {
+        "id": 3,
+        "type": "W",
+        "startRow": 30,
+        "section": "Y",
+        "title": "业务占比｜同期合并营收作分母",
+        "chart": "stacked_column",
+        "calcBlock": "SHARE",
+        "toggles": [
+          "早期总收入（未分业务）",
+          "旧分类1",
+          "旧分类2",
+          "旧分类3",
+          "业务1",
+          "业务2",
+          "业务3",
+          "业务4",
+          "业务5"
+        ],
+        "toggleRows": "A32:A40",
+        "note": "占比＝业务收入÷同期合并营收，不按已选项重新归一化。",
+        "source": "来源：{DATA}；占比，%。"
+      },
+      {
+        "id": 4,
+        "type": "S",
+        "startRow": 54,
+        "section": "Y",
+        "left": {
+          "title": "年度总营收｜显示指标",
+          "chart": "line",
+          "calcBlock": "TOTAL",
+          "toggles": [
+            "合并营收"
+          ],
+          "toggleRows": "A56",
+          "source": "来源：{DATA}；合并营收，亿美元。"
+        },
+        "right": {
+          "title": "年度营收同比｜显示指标",
+          "chart": "line",
+          "calcBlock": "TOTAL_YOY",
+          "toggles": [
+            "合并同比"
+          ],
+          "toggleRows": "I56",
+          "source": "来源：{DATA}；同比，%。"
+        }
+      },
+      {
+        "id": 5,
+        "type": "S",
+        "startRow": 72,
+        "section": "Y",
+        "left": {
+          "title": "现代业务同比｜显示业务",
+          "chart": "line",
+          "calcBlock": "SEG_YOY",
+          "toggles": [
+            "业务1",
+            "业务2",
+            "业务3",
+            "业务4",
+            "业务5"
+          ],
+          "toggleRows": "A74:A78",
+          "source": "=\"来源：{DATA}\"&CHAR(10)&$A$3&\"—\"&$C$3&\" 全年同比\""
+        },
+        "right": {
+          "title": "业务营收｜显示业务",
+          "chart": "line",
+          "calcBlock": "SEG_REV",
+          "toggles": [
+            "业务1",
+            "业务2",
+            "业务3",
+            "业务4",
+            "业务5",
+            "业务6",
+            "业务7"
+          ],
+          "toggleRows": "I74:I80",
+          "source": "来源：{DATA}；各业务营收，亿美元。"
+        }
+      },
+      {
+        "id": 6,
+        "type": "D",
+        "startRow": 90,
+        "section": "Q",
+        "title": "季度 · 近 12 个季度，用本区起始季、结束季"
+      },
+      {
+        "id": 7,
+        "type": "C",
+        "startRow": 92,
+        "section": "Q",
+        "controls": {
+          "A92": "起始季",
+          "C92": "结束季",
+          "A93": "quarterRange",
+          "C93": "quarterRange"
+        }
+      },
+      {
+        "id": 8,
+        "type": "S",
+        "startRow": 96,
+        "section": "Q",
+        "left": {
+          "title": "季度营收与同比｜显示指标",
+          "chart": "combo_qrev",
+          "calcBlock": "QREV",
+          "toggles": [
+            "季度营收",
+            "季度同比"
+          ],
+          "toggleRows": "A98:A99",
+          "source": "来源：{QDATA}；营收亿美元，同比 %。"
+        },
+        "right": {
+          "title": "季度利润率｜显示指标",
+          "chart": "line",
+          "calcBlock": "QMARGIN",
+          "toggles": [
+            "毛利率",
+            "营业利润率",
+            "净利率"
+          ],
+          "toggleRows": "I98:I100",
+          "source": "来源：{QDATA}；%。"
+        }
+      },
+      {
+        "id": 9,
+        "type": "D",
+        "startRow": 114,
+        "section": "E",
+        "title": "单期与事件 · 不受年份控制"
+      },
+      {
+        "id": 10,
+        "type": "S",
+        "startRow": 116,
+        "section": "E",
+        "left": {
+          "title": "最新半年各业务营收｜显示指标",
+          "chart": "column",
+          "calcBlock": "H1",
+          "toggles": [
+            "业务1",
+            "业务2",
+            "业务3",
+            "业务4",
+            "业务5",
+            "业务6",
+            "业务7"
+          ],
+          "toggleRows": "A118:A124",
+          "note": "最新半年，亿美元；互斥分类；不与全年直接比较。"
+        },
+        "right": {
+          "title": "已披露净现金收购对价｜显示指标",
+          "chart": "column",
+          "calcBlock": "MA",
+          "toggles": [
+            "净现金对价"
+          ],
+          "toggleRows": "I118",
+          "note": "只含已披露净现金对价，不含未披露金额与终止费。"
+        }
+      },
+      {
+        "id": 11,
+        "type": "D",
+        "startRow": 134,
+        "section": "M",
+        "title": "市值 · 用本区起始、结束年份与显示数据"
+      },
+      {
+        "id": 12,
+        "type": "C",
+        "startRow": 136,
+        "section": "M",
+        "controls": {
+          "A136": "起始年份",
+          "C136": "结束年份",
+          "E136": "显示数据",
+          "A137": "yearRange",
+          "C137": "yearRange",
+          "E137": "showData"
+        }
+      },
+      {
+        "id": 13,
+        "type": "W",
+        "startRow": 140,
+        "section": "M",
+        "title": "市值与营收｜显示指标",
+        "chart": "combo_mcap",
+        "calcBlock": "MCAP",
+        "yearControl": {
+          "start": "A137",
+          "end": "C137",
+          "show": "E137"
+        },
+        "toggles": [
+          "本公司市值",
+          "参考公司市值",
+          "本公司营收",
+          "参考公司营收"
+        ],
+        "toggleRows": "A142:A145",
+        "note": "市值与营收为不同口径；参考公司营收期间可能不同。",
+        "source": "=\"来源：市值与营收对比；\"&A137&\"—\"&C137&\"；亿美元。\""
+      }
+    ],
+    "footer": {
+      "row": 165,
+      "A": "所有显隐开关、年份与分组选择由编辑者操作，属于共用状态。",
+      "style": "note10"
+    },
+    "sections": {
+      "rule": "首页按时间口径分区，每区以 D 槽（分区标题带）开头；同一区内的图用同一组控件。顺序固定：年度 → 季度 → 单期与事件 → 市值（局部年份）。新图按口径归入对应区的末尾，不混放。",
+      "list": [
+        {
+          "id": "Y",
+          "title": "年度 · 随页顶起始、结束年份更新",
+          "control": "页顶 A3/C3"
+        },
+        {
+          "id": "Q",
+          "title": "季度 · 近 12 个季度，用本区起始季、结束季",
+          "control": "本区 C 槽：起始季 / 结束季（下拉引用 图表计算!$B$4:$B$60 季度清单）"
+        },
+        {
+          "id": "E",
+          "title": "单期与事件 · 不受年份控制",
+          "control": "无年份控件；事件图可有币种下拉"
+        },
+        {
+          "id": "M",
+          "title": "市值 · 用本区起始、结束年份与显示数据",
+          "control": "本区 C 槽：起始年份 / 结束年份 / 显示数据"
+        }
+      ]
+    },
+    "hardGuarantees": {
+      "invariant": "每个槽位：rows*24 - chart.heightPx >= 24；双宽 24*24-540=36，单宽 18*24-384=48。建图前由脚本断言，不满足即中止。",
+      "lock1_explicitRowHeights": {
+        "request": "updateDimensionProperties",
+        "range": {
+          "sheetId": "{OVERVIEW_ID}",
+          "dimension": "ROWS",
+          "startIndex": 0,
+          "endIndex": 170
+        },
+        "properties": {
+          "pixelSize": 24
+        },
+        "fields": "pixelSize",
+        "note": "第 1 行单独设 32。显式 pixelSize 后 Google 不再按内容自动调行高；说明文字超出只裁剪不撑高。"
+      },
+      "lock2_chartAnchorFromSlotTable": {
+        "rule": "addChart 的 anchorCell.rowIndex = slot.startRow-1，columnIndex 固定 2（左）或 10（右），offsetX/Y = 0；坐标只能由 slots 表算出，脚本不接受手填坐标。",
+        "widthHeight": "widthPixels/heightPixels 只能取 1180×540 或 590×384 两档。"
+      },
+      "lock3_protectSheet": {
+        "request": "addProtectedRange",
+        "protectedRange": {
+          "range": {
+            "sheetId": "{OVERVIEW_ID}"
+          },
+          "description": "图表总览结构锁：不得增删行列、隐藏行、拖动图表；只放开控件单元格",
+          "warningOnly": false,
+          "editors": {
+            "users": [
+              "{OWNER_EMAIL}"
+            ]
+          },
+          "unprotectedRanges": [
+            "页顶 A3, C3",
+            "每个槽位的 toggleRows（A 列或 I 列）",
+            "每个 C 槽的控件格 A{r+1}, C{r+1}, E{r+1}"
+          ]
+        },
+        "note": "受保护后非所有者只能改勾选框和下拉；所有者改结构时先临时解除。"
+      },
+      "lock4_postBuildAssert": {
+        "step": "建完读回 charts[].position 与 rowMetadata，逐图算图底边所在行，须落在本槽位内；任一失败即报错并回滚。",
+        "maps_to": "Excel规范 第 5 节 E7"
+      },
+      "lock5_labelWidthAssert": {
+        "rule": "每条 B 列标签估算宽度 ≤ 344 px（B 列 360 − 16），估算 = 全角×13.5 + 半角×7；超宽即中止并提示改用简称表",
+        "maps_to": "Excel规范 2.4 / E5"
+      }
+    }
+  },
+  "styles": {
+    "mainTitle": {
+      "fontSize": 18,
+      "bold": true,
+      "fg": "#111827",
+      "bg": null,
+      "vAlign": "MIDDLE",
+      "borderBottom": "#E5E7EB SOLID 1"
+    },
+    "label11": {
+      "fontSize": 10,
+      "bold": false,
+      "fg": "#6B7280"
+    },
+    "control": {
+      "fontSize": 11,
+      "bold": true,
+      "fg": "#111827",
+      "bg": "#FFFFFF",
+      "border": "#D1D5DB SOLID 1 四边",
+      "numberFormat": "0"
+    },
+    "blockTitle": {
+      "fontSize": 11,
+      "bold": true,
+      "fg": "#111827",
+      "wrap": "WRAP"
+    },
+    "toggleLabel": {
+      "fontSize": 10,
+      "bold": true,
+      "fg": "<系列色>",
+      "wrap": "CLIP",
+      "format": "● 简称（起–止）",
+      "maxWidthPx": 344,
+      "widthEstimate": "全角×13.5 + 半角×7 + 16",
+      "onOverflow": "用 说明页 简称表 的简称；无简称则中止"
+    },
+    "note9": {
+      "fontSize": 9,
+      "fg": "#6B7280",
+      "wrap": "WRAP",
+      "vAlign": "TOP"
+    },
+    "note10": {
+      "fontSize": 10,
+      "fg": "#6B7280"
+    },
+    "title14": {
+      "fontSize": 14,
+      "bold": true,
+      "fg": "#1E4FA3"
+    },
+    "header": {
+      "fontSize": 10,
+      "bold": true,
+      "fg": "#FFFFFF",
+      "bg": "#1F4E78",
+      "wrap": "WRAP"
+    },
+    "sectionTitle": {
+      "fontSize": 10,
+      "bold": true,
+      "fg": "#6B7280",
+      "bg": null,
+      "borderTop": "#E5E7EB SOLID 1",
+      "merge": "A:L"
+    },
+    "checkboxCol": {
+      "bg": null,
+      "note": "不加底色，Google 默认勾选框样式"
+    }
+  },
+  "validations": {
+    "checkbox": {
+      "condition": {
+        "type": "BOOLEAN"
+      },
+      "showCustomUi": true,
+      "strict": true,
+      "default": true
+    },
+    "yearRange": {
+      "condition": {
+        "type": "ONE_OF_RANGE",
+        "values": [
+          {
+            "userEnteredValue": "=图表计算!$A$4:$A$60"
+          }
+        ]
+      },
+      "showCustomUi": true,
+      "strict": true
+    },
+    "showData": {
+      "condition": {
+        "type": "ONE_OF_LIST",
+        "values": [
+          {
+            "userEnteredValue": "全部"
+          },
+          {
+            "userEnteredValue": "只看市值"
+          },
+          {
+            "userEnteredValue": "只看营收"
+          }
+        ]
+      },
+      "showCustomUi": true,
+      "strict": true,
+      "default": "全部"
+    },
+    "metricSelect": {
+      "condition": {
+        "type": "ONE_OF_RANGE",
+        "values": [
+          {
+            "userEnteredValue": "=图表计算!$CK$2:$CK$30"
+          }
+        ]
+      },
+      "showCustomUi": true,
+      "strict": true
+    },
+    "quarterRange": {
+      "condition": {
+        "type": "ONE_OF_RANGE",
+        "values": [
+          {
+            "userEnteredValue": "=图表计算!$B$4:$B$60"
+          }
+        ]
+      },
+      "showCustomUi": true,
+      "strict": true
+    }
+  },
+  "calc": {
+    "yearList": {
+      "cell": "A3",
+      "header": "年份清单",
+      "formula": "=SORT(UNIQUE(FILTER(VALUE({DATA}!$A$4:$A$200),{DATA}!$B$4:$B$200=\"全年\")))",
+      "range": "A4:A60"
+    },
+    "mappingTable": {
+      "range": "CK1:CN30",
+      "headers": [
+        "下拉显示",
+        "原字段键",
+        "选中项说明",
+        "现有已填期间"
+      ]
+    },
+    "blockLayout": {
+      "headerRow": 3,
+      "dataRows": "4..60",
+      "gapCols": 1,
+      "numberFormats": {
+        "金额": "#,##0.0",
+        "占比同比": "0.0%",
+        "年份": "0",
+        "倍数": "0.0\"x\""
+      },
+      "headerRule": "第 3 行表头静态文字，永不随开关变空"
+    },
+    "blocks": [
+      {
+        "id": "REV",
+        "cols": "D:O",
+        "period": "D",
+        "series": [
+          "合并总营收",
+          "早期总收入",
+          "旧分类1",
+          "旧分类2",
+          "旧分类3",
+          "业务1",
+          "业务2",
+          "业务3",
+          "业务4",
+          "业务5"
+        ],
+        "toggleCells": "图表总览!$A$8 … $A$17"
+      },
+      {
+        "id": "SHARE",
+        "cols": "Q:Z",
+        "period": "Q",
+        "series": [
+          "早期占比",
+          "旧分类1占比",
+          "旧分类2占比",
+          "旧分类3占比",
+          "业务1占比",
+          "业务2占比",
+          "业务3占比",
+          "业务4占比",
+          "业务5占比"
+        ],
+        "toggleCells": "图表总览!$A$32 … $A$40"
+      },
+      {
+        "id": "TOTAL",
+        "cols": "AB:AC",
+        "period": "AB",
+        "series": [
+          "合并营收"
+        ],
+        "toggleCells": "图表总览!$A$56"
+      },
+      {
+        "id": "TOTAL_YOY",
+        "cols": "AE:AF",
+        "period": "AE",
+        "series": [
+          "合并同比"
+        ],
+        "toggleCells": "图表总览!$I$56"
+      },
+      {
+        "id": "SEG_YOY",
+        "cols": "AH:AM",
+        "period": "AH",
+        "series": [
+          "业务1同比",
+          "业务2同比",
+          "业务3同比",
+          "业务4同比",
+          "业务5同比"
+        ],
+        "toggleCells": "图表总览!$A$74 … $A$78"
+      },
+      {
+        "id": "SEG_REV",
+        "cols": "AO:AV",
+        "period": "AO",
+        "series": [
+          "业务1",
+          "业务2",
+          "业务3",
+          "业务4",
+          "业务5",
+          "业务6",
+          "业务7"
+        ],
+        "toggleCells": "图表总览!$I$74 … $I$80"
+      },
+      {
+        "id": "QREV",
+        "cols": "AX:AZ",
+        "period": "AX",
+        "periodSource": "quarter",
+        "series": [
+          "季度营收",
+          "季度同比"
+        ],
+        "toggleCells": "图表总览!$A$98, $A$99",
+        "quarterControl": {
+          "start": "图表总览!$A$93",
+          "end": "图表总览!$C$93"
+        }
+      },
+      {
+        "id": "QMARGIN",
+        "cols": "BB:BE",
+        "period": "BB",
+        "periodSource": "quarter",
+        "series": [
+          "毛利率",
+          "营业利润率",
+          "净利率"
+        ],
+        "toggleCells": "图表总览!$I$98 … $I$100",
+        "quarterControl": {
+          "start": "图表总览!$A$93",
+          "end": "图表总览!$C$93"
+        }
+      },
+      {
+        "id": "H1",
+        "cols": "BG:BH",
+        "period": "BG",
+        "periodIsCategory": true,
+        "series": [
+          "最新半年营收"
+        ],
+        "toggleCells": "图表总览!$A$118 … $A$124"
+      },
+      {
+        "id": "MA",
+        "cols": "BJ:BK",
+        "period": "BJ",
+        "periodIsCategory": true,
+        "filterAware": true,
+        "series": [
+          "净现金对价"
+        ],
+        "toggleCells": "图表总览!$I$118"
+      },
+      {
+        "id": "MCAP",
+        "cols": "BM:BQ",
+        "period": "BM",
+        "yearControl": {
+          "start": "图表总览!$A$137",
+          "end": "图表总览!$C$137",
+          "show": "图表总览!$E$137"
+        },
+        "series": [
+          "本公司市值",
+          "参考公司市值",
+          "本公司营收",
+          "参考公司营收"
+        ],
+        "toggleCells": "图表总览!$A$142 … $A$145"
+      }
+    ],
+    "formulaTemplates": {
+      "period": "=IFERROR(FILTER({DATA}!$A$4:$A$200,{DATA}!$B$4:$B$200=\"全年\",VALUE({DATA}!$A$4:$A$200)>={START},VALUE({DATA}!$A$4:$A$200)<={END}),\"\")",
+      "series": "=IF({TOGGLE},IFERROR(FILTER(IF(ISNUMBER({DATA}!{COL}$4:{COL}$200),{DATA}!{COL}$4:{COL}$200,\"\"),{DATA}!$B$4:$B$200=\"全年\",VALUE({DATA}!$A$4:$A$200)>={START},VALUE({DATA}!$A$4:$A$200)<={END}),\"\"),\"\")",
+      "seriesWindow": "=IF({TOGGLE},IFERROR(FILTER(IF((VALUE({DATA}!$A$4:$A$200)>={WIN_START})*(VALUE({DATA}!$A$4:$A$200)<={WIN_END})*ISNUMBER({DATA}!{COL}$4:{COL}$200),{DATA}!{COL}$4:{COL}$200,\"\"),{DATA}!$B$4:$B$200=\"全年\",VALUE({DATA}!$A$4:$A$200)>={START},VALUE({DATA}!$A$4:$A$200)<={END}),\"\"),\"\")",
+      "seriesShowData": "=IF(AND({TOGGLE},{SHOW}<>\"{EXCLUDE}\"),IFERROR(FILTER(IF(ISNUMBER({DATA}!{COL}$4:{COL}$200),{DATA}!{COL}$4:{COL}$200,\"\"),VALUE({DATA}!$A$4:$A$200)>={START},VALUE({DATA}!$A$4:$A$200)<={END}),\"\"),\"\")",
+      "metricHeader": "=IFERROR(VLOOKUP({METRIC_CELL},$CK$2:$CN$30,2,FALSE),{METRIC_CELL})",
+      "metricSeries": "=IF({TOGGLE},IFERROR(FILTER(IF(ISNUMBER(INDEX({DATA}!$D$4:$AZ$200,0,MATCH({HEADER_CELL}&\"（亿美元）\",{DATA}!$D$3:$AZ$3,0))),INDEX({DATA}!$D$4:$AZ$200,0,MATCH({HEADER_CELL}&\"（亿美元）\",{DATA}!$D$3:$AZ$3,0)),\"\"),{DATA}!$B$4:$B$200=\"全年\",VALUE({DATA}!$A$4:$A$200)>={START},VALUE({DATA}!$A$4:$A$200)<={END}),\"\"),\"\")",
+      "filterAware": "=IF(SUBTOTAL(103,{DATA}!A{ROW})=0,\"\",{DATA}!{COL}{ROW})",
+      "categoryPeriod": "={DATA}!$A${ROW}",
+      "categorySeries": "=IF({TOGGLE},IF(ISNUMBER({DATA}!{COL}${ROW}),{DATA}!{COL}${ROW},\"\"),\"\")",
+      "label": "=\"● \"&REGEXREPLACE(图表计算!{HEADER_CELL},\"[（(].*[）)]\",\"\")",
+      "quarterPeriod": "=IFERROR(FILTER({QDATA}!$A$4:$A$60,MATCH({QDATA}!$A$4:$A$60,$B$4:$B$60,0)>=MATCH({QSTART},$B$4:$B$60,0),MATCH({QDATA}!$A$4:$A$60,$B$4:$B$60,0)<=MATCH({QEND},$B$4:$B$60,0)),\"\")",
+      "quarterSeries": "=IF({TOGGLE},IFERROR(FILTER(IF(ISNUMBER({QDATA}!{COL}$4:{COL}$60),{QDATA}!{COL}$4:{COL}$60,\"\"),MATCH({QDATA}!$A$4:$A$60,$B$4:$B$60,0)>=MATCH({QSTART},$B$4:$B$60,0),MATCH({QDATA}!$A$4:$A$60,$B$4:$B$60,0)<=MATCH({QEND},$B$4:$B$60,0)),\"\"),\"\")"
+    },
+    "defaults": {
+      "START": "图表总览!$A$3",
+      "END": "图表总览!$C$3"
+    },
+    "quarterList": {
+      "cell": "B3",
+      "header": "季度清单",
+      "formula": "={QDATA}!$A$4:$A$15",
+      "range": "B4:B60",
+      "note": "{QDATA} = 近12季度明细 语义页，A 列季度文本如 2025Q3，按时间升序"
+    }
+  },
+  "chartArchetypes": {
+    "_common": {
+      "titleTextFormat": {
+        "fontFamily": "Noto Sans SC",
+        "fontSize": 10
+      },
+      "backgroundColor": "#FFFFFF",
+      "legendPosition": "BOTTOM_LEGEND",
+      "axisTextFontSize": 9,
+      "legendFontSize": 9,
+      "gridlines": {
+        "color": "#D9D9D9",
+        "behindData": true
+      },
+      "lineSmoothing": false,
+      "pointStyle": "NONE",
+      "dataLabels": "NONE",
+      "threeDimensional": false,
+      "border": "NONE",
+      "domainSourceRange": "{CALC}!{PERIOD_COL}4:{PERIOD_COL}60",
+      "seriesSourceRange": "{CALC}!{SERIES_COL}4:{SERIES_COL}60",
+      "headerCount": 0,
+      "seriesRule": "每个系列单独 sourceRange（第 4–60 行，不含表头），各自写死 color 与 type；禁止单个多列范围 + headerCount；图表计算第 3 行表头为静态文字"
+    },
+    "combo_stacked": {
+      "spec": {
+        "title": "{TITLE}",
+        "basicChart": {
+          "chartType": "COMBO",
+          "stackedType": "STACKED",
+          "legendPosition": "BOTTOM_LEGEND",
+          "axis": [
+            {
+              "position": "BOTTOM_AXIS",
+              "title": "年度"
+            },
+            {
+              "position": "LEFT_AXIS",
+              "title": "亿美元"
+            }
+          ],
+          "domains": [
+            {
+              "domain": {
+                "sourceRange": {
+                  "sources": [
+                    "{PERIOD}"
+                  ]
+                }
+              }
+            }
+          ],
+          "series": [
+            {
+              "series": {
+                "sourceRange": {
+                  "sources": [
+                    "{S1}"
+                  ]
+                }
+              },
+              "type": "LINE",
+              "targetAxis": "LEFT_AXIS",
+              "color": "#1F2937",
+              "lineStyle": {
+                "width": 2
+              }
+            },
+            {
+              "series": {
+                "sourceRange": {
+                  "sources": [
+                    "{S2..S10}"
+                  ]
+                }
+              },
+              "type": "COLUMN",
+              "targetAxis": "LEFT_AXIS",
+              "color": "<palette n 按堆叠顺序>"
+            }
+          ]
+        }
+      },
+      "position": {
+        "overlayPosition": {
+          "anchorCell": {
+            "sheetId": "{OVERVIEW_ID}",
+            "rowIndex": "{START_ROW-1}",
+            "columnIndex": 2
+          },
+          "offsetXPixels": 0,
+          "offsetYPixels": 0,
+          "widthPixels": 1180,
+          "heightPixels": 540
+        }
+      }
+    },
+    "stacked_column": {
+      "spec": {
+        "title": "{TITLE}",
+        "basicChart": {
+          "chartType": "COLUMN",
+          "stackedType": "STACKED",
+          "legendPosition": "BOTTOM_LEGEND",
+          "axis": [
+            {
+              "position": "BOTTOM_AXIS",
+              "title": "年度"
+            },
+            {
+              "position": "LEFT_AXIS",
+              "title": "占同期营收比例",
+              "format": "0%"
+            }
+          ],
+          "domains": [
+            {
+              "domain": {
+                "sourceRange": {
+                  "sources": [
+                    "{PERIOD}"
+                  ]
+                }
+              }
+            }
+          ],
+          "series": [
+            {
+              "series": {
+                "sourceRange": {
+                  "sources": [
+                    "{S1..S9}"
+                  ]
+                }
+              },
+              "targetAxis": "LEFT_AXIS",
+              "color": "<palette n>"
+            }
+          ]
+        }
+      },
+      "position": {
+        "overlayPosition": {
+          "anchorCell": {
+            "sheetId": "{OVERVIEW_ID}",
+            "rowIndex": "{START_ROW-1}",
+            "columnIndex": 2
+          },
+          "widthPixels": 1180,
+          "heightPixels": 540
+        }
+      }
+    },
+    "line": {
+      "spec": {
+        "title": "{TITLE}",
+        "basicChart": {
+          "chartType": "LINE",
+          "legendPosition": "BOTTOM_LEGEND",
+          "lineSmoothing": false,
+          "axis": [
+            {
+              "position": "BOTTOM_AXIS",
+              "title": "年度"
+            },
+            {
+              "position": "LEFT_AXIS",
+              "title": "{UNIT}"
+            }
+          ],
+          "domains": [
+            {
+              "domain": {
+                "sourceRange": {
+                  "sources": [
+                    "{PERIOD}"
+                  ]
+                }
+              }
+            }
+          ],
+          "series": [
+            {
+              "series": {
+                "sourceRange": {
+                  "sources": [
+                    "{S1..Sn}"
+                  ]
+                }
+              },
+              "targetAxis": "LEFT_AXIS",
+              "color": "<palette n>",
+              "lineStyle": {
+                "width": 2
+              }
+            }
+          ]
+        }
+      },
+      "position": {
+        "overlayPosition": {
+          "anchorCell": {
+            "sheetId": "{OVERVIEW_ID}",
+            "rowIndex": "{START_ROW-1}",
+            "columnIndex": "{2 左 | 10 右}"
+          },
+          "widthPixels": 590,
+          "heightPixels": 384
+        }
+      }
+    },
+    "column": {
+      "spec": {
+        "title": "{TITLE}",
+        "basicChart": {
+          "chartType": "COLUMN",
+          "legendPosition": "BOTTOM_LEGEND",
+          "axis": [
+            {
+              "position": "BOTTOM_AXIS",
+              "title": "业务"
+            },
+            {
+              "position": "LEFT_AXIS",
+              "title": "亿美元"
+            }
+          ],
+          "domains": [
+            {
+              "domain": {
+                "sourceRange": {
+                  "sources": [
+                    "{CATEGORY}"
+                  ]
+                }
+              }
+            }
+          ],
+          "series": [
+            {
+              "series": {
+                "sourceRange": {
+                  "sources": [
+                    "{S1}"
+                  ]
+                }
+              },
+              "targetAxis": "LEFT_AXIS",
+              "color": "#1E4FA3"
+            }
+          ]
+        }
+      },
+      "position": {
+        "overlayPosition": {
+          "anchorCell": {
+            "sheetId": "{OVERVIEW_ID}",
+            "rowIndex": "{START_ROW-1}",
+            "columnIndex": 10
+          },
+          "widthPixels": 590,
+          "heightPixels": 384
+        }
+      }
+    },
+    "combo_mcap": {
+      "spec": {
+        "title": "{TITLE}",
+        "basicChart": {
+          "chartType": "COMBO",
+          "legendPosition": "BOTTOM_LEGEND",
+          "axis": [
+            {
+              "position": "BOTTOM_AXIS",
+              "title": "年度"
+            },
+            {
+              "position": "LEFT_AXIS",
+              "title": "市值（亿美元）"
+            },
+            {
+              "position": "RIGHT_AXIS",
+              "title": "营收（亿美元）"
+            }
+          ],
+          "domains": [
+            {
+              "domain": {
+                "sourceRange": {
+                  "sources": [
+                    "{PERIOD}"
+                  ]
+                }
+              }
+            }
+          ],
+          "series": [
+            {
+              "series": {
+                "sourceRange": {
+                  "sources": [
+                    "{S1}"
+                  ]
+                }
+              },
+              "type": "COLUMN",
+              "targetAxis": "LEFT_AXIS",
+              "color": "#1E4FA3"
+            },
+            {
+              "series": {
+                "sourceRange": {
+                  "sources": [
+                    "{S2}"
+                  ]
+                }
+              },
+              "type": "COLUMN",
+              "targetAxis": "LEFT_AXIS",
+              "color": "#C4C9D1"
+            },
+            {
+              "series": {
+                "sourceRange": {
+                  "sources": [
+                    "{S3}"
+                  ]
+                }
+              },
+              "type": "LINE",
+              "targetAxis": "RIGHT_AXIS",
+              "color": "#1E8C7A",
+              "lineStyle": {
+                "width": 2
+              }
+            },
+            {
+              "series": {
+                "sourceRange": {
+                  "sources": [
+                    "{S4}"
+                  ]
+                }
+              },
+              "type": "LINE",
+              "targetAxis": "RIGHT_AXIS",
+              "color": "#F4C63A",
+              "lineStyle": {
+                "width": 2
+              }
+            }
+          ]
+        }
+      },
+      "position": {
+        "overlayPosition": {
+          "anchorCell": {
+            "sheetId": "{OVERVIEW_ID}",
+            "rowIndex": "{START_ROW-1}",
+            "columnIndex": 2
+          },
+          "widthPixels": 1180,
+          "heightPixels": 540
+        }
+      }
+    },
+    "combo_qrev": {
+      "spec": {
+        "title": "{TITLE}",
+        "basicChart": {
+          "chartType": "COMBO",
+          "legendPosition": "BOTTOM_LEGEND",
+          "axis": [
+            {
+              "position": "BOTTOM_AXIS",
+              "title": "季度"
+            },
+            {
+              "position": "LEFT_AXIS",
+              "title": "亿美元"
+            },
+            {
+              "position": "RIGHT_AXIS",
+              "title": "同比",
+              "format": "0%"
+            }
+          ],
+          "domains": [
+            {
+              "domain": {
+                "sourceRange": {
+                  "sources": [
+                    "{PERIOD}"
+                  ]
+                }
+              }
+            }
+          ],
+          "series": [
+            {
+              "series": {
+                "sourceRange": {
+                  "sources": [
+                    "{S1}"
+                  ]
+                }
+              },
+              "type": "COLUMN",
+              "targetAxis": "LEFT_AXIS",
+              "color": "#1E4FA3"
+            },
+            {
+              "series": {
+                "sourceRange": {
+                  "sources": [
+                    "{S2}"
+                  ]
+                }
+              },
+              "type": "LINE",
+              "targetAxis": "RIGHT_AXIS",
+              "color": "#F4C63A",
+              "lineStyle": {
+                "width": 2
+              }
+            }
+          ]
+        }
+      },
+      "position": {
+        "overlayPosition": {
+          "anchorCell": {
+            "sheetId": "{OVERVIEW_ID}",
+            "rowIndex": "{START_ROW-1}",
+            "columnIndex": 2
+          },
+          "widthPixels": 590,
+          "heightPixels": 384
+        }
+      }
+    }
+  },
+  "build": {
+    "pathA_copyMaster": [
+      "Drive 复制母版 `_母版_图表总览` → 按存储规范改名 `研究对象_历史数据_YYYYMMDD_V1.0`",
+      "复制后立即重新执行 lock1（行高）与 lock3（保护范围），不依赖复制是否保留",
+      "把语义页数据贴进 数据页（或转换后的 openpyxl 语义页整页复制进来），按内容改页名；在 图表计算 查找替换 `数据页` → 新页名",
+      "改首页：A1 代码、E3 使用说明、各块标题、开关标签文字与颜色、口径说明、来源行；按真实业务数改开关数（删多余开关行的勾选框与标签，不删行）",
+      "不用的槽位：删除该槽位全部行（图随行删除）；后续槽位自动上移，公式引用不受影响",
+      "跑 Excel规范 第 5 节验收 E1–E11，结果写进自检"
+    ],
+    "pathB_api": [
+      "spreadsheets.create：三张表（图表总览 / 数据页 / 图表计算），取 sheetId",
+      "断言 hardGuarantees.invariant；不满足则中止",
+      "batchUpdate：updateSheetProperties（网格线、冻结、标签色）；updateDimensionProperties（列宽、行高）",
+      "batchUpdate：首页 header 单元格与样式（repeatCell）；mergeCells",
+      "batchUpdate：每个槽位——块标题、勾选框 setDataValidation(BOOLEAN)、标签值与颜色、说明与来源合并区",
+      "batchUpdate：图表计算 年份清单、映射表、各 block 表头与公式（按 formulaTemplates 展开），数字格式",
+      "batchUpdate：首页年份下拉 setDataValidation(ONE_OF_RANGE → 图表计算!A4:A60)；显示数据下拉",
+      "batchUpdate：addChart ×N，按 chartArchetypes 填 sheetId、范围、颜色、锚点",
+      "updateSheetProperties：隐藏 图表计算",
+      "跑验收 E1–E11",
+      "执行 lock3 addProtectedRange；执行 lock4 读回断言，失败回滚"
+    ],
+    "forbidden": [
+      "首页与图表计算不走 openpyxl → xlsx → 转换",
+      "图表不引用语义页",
+      "不用日期轴",
+      "不写死年份上限",
+      "不在 FILTER 外面漏 IFERROR"
+    ]
+  }
+}

@@ -491,10 +491,13 @@ grep -q "^### 13.1 研究报告图表工作簿结构：数据规范" research-so
 grep -q "^| WB02 | overview_dashboard | \*\*硬门槛\*\*" research-sop/standards/格式规范.md
 grep -q "^| WB04 | overview_year_filter | 软门槛" research-sop/standards/格式规范.md
 grep -q "⑫ \*\*（硬性）图表工作簿结构\*\*" research-sop/standards/审稿清单.md
-grep -q "共 12 条；⑦、⑩、⑫ 为硬性" research-sop/standards/审稿清单.md
+grep -q "共 13 条；⑦、⑩、⑫、⑬ 为硬性" research-sop/standards/审稿清单.md
+grep -q "⑬ \*\*（硬性）首页按 Excel 规范第 5 节 E1–E12 自查\*\*" research-sop/standards/审稿清单.md
+grep -q "⑬ （硬性）首页 E1–E12" research-sop/templates/trail_selfcheck.md
+test -s research-sop/standards/Excel规范.md && python3 -c "import json,sys; json.load(open(sys.argv[1], encoding='utf8'))" research-sop/templates/图表总览模板.json
 grep -q "⑫ （硬性）图表工作簿结构" research-sop/templates/trail_selfcheck.md
-if grep -n "审稿清单.md\` 十一条\|十一条机械检查" research-sop/SKILL.md research-sop/PROMPT.md research-sop/templates/trail_selfcheck.md research-prompt/templates/任务书模板.md; then
-  echo "审稿清单已是十二条，不得再写十一条"; exit 1
+if grep -n "审稿清单.md\` 十一条\|十一条机械检查\|审稿清单.md\` 十二条\|十二条机械检查" research-sop/SKILL.md research-sop/PROMPT.md research-sop/templates/trail_selfcheck.md research-prompt/templates/*.md; then
+  echo "审稿清单已是十三条，不得再写十一条或十二条"; exit 1
 fi
 echo "check_delivery 第 13 项：合规图表工作簿通过；编号页名、总览不在第一张、总览无原生图表、无图表计算页、无来源页、总览图引用语义页、取不到工作簿、--workbook 不存在都不通过且退出码 1；没有配套表格记不适用；--report 按研究对象与版本号挑表格；格式规范 13.1（WB02 硬、WB04 软）、审稿清单 ⑫、自检模板与计数同步"
 
