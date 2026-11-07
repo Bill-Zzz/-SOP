@@ -5,7 +5,7 @@ description: 从本地研报库出发做股票研究：检索并读取相关券�
 
 # 研报库驱动的估值研究：检索 → 阅读 → 讨论 → 建模与报告 → 核查 → 迭代
 
-本文件与具体 AI 平台无关，任何能读文件、运行 shell/Python 的智能体都可以照做；只能对话的 AI 请用 `PROMPT.md`。
+本文件与具体 AI 平台无关，任何能读文件、运行 shell/Python 的智能体都可以照做；只能对话的 AI 直接粘贴 SKILL.md。
 脚本在 `scripts/`，模板在 `templates/`，估值方法与建模规范见 `METHODS.md`，案例在 `examples/`。当前版本见 `VERSION`。
 
 ## 三种模式
@@ -31,7 +31,7 @@ description: 从本地研报库出发做股票研究：检索并读取相关券�
 |---|---|
 | Claude Code 或其他本地智能体 | 直接在研报库所在的机器上运行脚本 |
 | Claude 应用（已关联用户电脑） | 先申请访问研报库所在的文件夹；能在用户电脑上执行命令时直接运行脚本，不能执行时，只把检索选中的 PDF 拷贝到工作区处理 |
-| 只能对话的 AI | 用户手动上传选中的研报，按 `PROMPT.md` 执行 |
+| 只能对话的 AI | 用户手动上传选中的研报，直接粘贴 SKILL.md 执行 |
 
 依赖：Python 3 + `openpyxl numpy`。PDF 处理装 `pymupdf` 或 `pypdf`（pip 即可）或 poppler；OCR 用 tesseract 或 `rapidocr-onnxruntime`（pip 即可）；重算 Excel 需要 LibreOffice。运行 `python3 scripts/pdf_text.py check` 可以查看当前哪些工具可用。缺少的工具不影响其余步骤，但交付时要说明哪些步骤因此没做或做了降级处理。
 
@@ -179,7 +179,7 @@ python3 scripts/xlsx_diff.py model.xlsx out/patched.xlsx --values 估值汇总!B
    - 运行 `bash tests/run_tests.sh`，全部通过后再提交
 4. **案例沉淀：** 每完成一家公司，在 `examples/<代码>/` 记录方法、结论和对账基准值（不含研报摘录），作为回归测试的基准。
 5. **保持精简：** SKILL.md 只保留通用规则，具体公司的细节放进案例；新陷阱写进"常见陷阱"，并注明来自哪个案例。不放宽核心原则，除非用户明确同意。
-6. **同步：** 仓库是唯一的版本来源。Claude Code 把技能目录指向克隆下来的仓库（建议软链接），用 `git pull` 更新；其他平台从仓库重新复制 `SKILL.md` 或 `PROMPT.md`。
+6. **同步：** 仓库是唯一的版本来源。Claude Code 把技能目录指向克隆下来的仓库（建议软链接），用 `git pull` 更新；其他平台从仓库重新复制 `SKILL.md`。
 
 ## 常见陷阱
 - openpyxl 保存已有工作簿会丢图表；LibreOffice 默认不重算 xlsx（`lo_recalc.sh` 已处理）。（CRWV）

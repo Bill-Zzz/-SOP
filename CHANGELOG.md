@@ -2,6 +2,71 @@
 
 版本号规则：大版本.小版本.修订。流程或产出结构变化升小版本；脚本修复、陷阱补充升修订号；不兼容的重构升大版本。
 
+## 0.21.0 — 2026-11-07：图表总览交互首页规范（Excel 规范 V1.6）
+
+经 AAPL 副本验收后升至 Excel 规范 V1.6，本版一并收入：
+- 配色漂移根治：Google 会删除整列为空的系列并让后续系列按位置前移颜色；规定每个系列公式包 `=LET(r,<原公式>,IF(COUNT(r)=0,0,r))` 占位，系列永不消失。
+- 图表范围含第 3 行静态短名表头、`headerCount=1`，悬停与图例显示系列名。
+- 灰色 `#9AA3AF` 只给"未拆分 / 对照"，永远排在系列最后；堆叠顺序为现代业务按收入从大到小、旧分类在后、未拆分最后。
+- 首页四个时间口径分区各一条浅色色带（区色底、区色深字、左侧区色竖线），页面其余处无填充色。
+- 删多余行：首页行数 = 页尾行 + 1（2.3a 锁 5）。
+- 首页每张图 1 px 灰边框 `#9CA3AF`；双轴图左右两条纵轴都必须写"指标（单位）"标题。实线纵轴 Sheets API 无开关，不做。
+起因：AAPL V1.0 首页验收发现标签被图盖住、关开关后系列颜色错位（见 `LESSONS.md` 同日一条）。首页"图表总览"此前只有格式规范第 13.1 节 WB01–WB06 的结构门槛，没有布局、交互、色板的细则，各次生成各不相同。本版并入用户提供的两份文件，原样放入，内容不改；脚本一行不改。
+1. 新增 `research-sop/standards/Excel规范.md`（V1.5）：首页交互看板规范——槽位式布局、五道不重叠锁、按时间口径四区、首页中性灰页面色（仅首页）、十色中等饱和深浅交替色板、交互必须实测；首页与"图表计算"走复制母版或 Sheets API 直建，不再由 openpyxl → xlsx 生成；0a 八条与第 5 节 E1–E12 验收、自检表。与格式规范冲突时以它为准（仅首页）。
+2. 新增 `research-sop/templates/图表总览模板.json`：首页与"图表计算"的机器可读定义（槽位、单元格、验证、格式、图表 Sheets API 规格、公式模板）。
+3. `research-sop/SKILL.md`：版本行改 0.21.0 并写本版要点（旧要点保留）；D1"财务全史 Excel"段末加：首页与"图表计算"按 Excel 规范 0a 执行，`build_history_xlsx.py` 只生成语义页；D5"数据表"加：首页按 Excel 规范第 5 节 E1–E12 验收并填自检表；"存储与格式规范"加 Excel 规范一条；"图表可读性"每图最多 3 个系列加"图表总览交互图除外，按 Excel 规范 2.5"；审稿清单计数改十三条。
+4. `research-sop/templates/financial_history_spec.md`："图表总览"一行改为"按 `standards/Excel规范.md` 与 `templates/图表总览模板.json` 建，见该规范"（SKILL.md 文末已无"附：历史数据 Excel 规格"副本，规格正本在此文件）。
+5. `research-sop/standards/格式规范.md`：第 8 节加"图表总览"页按 Excel 规范 2.1、不受冻结 / A 列 260 px / 填充色限制；第 13 节加图表工作簿内系列色板按 Excel 规范 2.6，第 7 节报告图色板暂不改；第 13.1 节加首页细则见 Excel 规范、验收 E1–E12；第 16 节修订记录加 0.21.0 一条。
+6. `research-sop/standards/审稿清单.md`：加 ⑬（硬性）首页按 Excel 规范第 5 节 E1–E12 自查，硬项未过不得交付；计数改为共 13 条、⑦⑩⑫⑬ 为硬性。引用同步：`templates/trail_selfcheck.md` 加 ⑬ 一行、计数十三条；`PROMPT.md` 版本行与两处计数；research-prompt 三份题型模板与任务书模板计数。
+7. `tests/run_tests.sh` 第 7 节：审稿清单计数断言改为 13 条并查 ⑬、自检模板 ⑬ 行；Excel 规范存在、图表总览模板 JSON 可解析；"十二条"旧计数不得残留。
+
+待办：
+- `check_delivery.py` 第 14 项（首页能机器读的项）待实现；实现前按 Excel 规范与模板建，建页脚本断言卡住。
+- 格式规范第 7 节报告图色板是否改为 Excel 规范 2.6 十色色板，待定。
+- `build_history_xlsx.py` 仍生成"图表总览"与"图表计算"两页（测试依赖）；按 0a 改为只生成语义页另做。
+
+### 取消 AI 自检
+原则：AI 给自己打分的自检没有意义；规则写对、脚本卡住，AI 一遍做对，做不对记 LESSONS 改 skill。
+- 删 `research-sop/templates/trail_selfcheck.md` 与留档里的"自检"件；SKILL.md D4"自检九问"与"耗时记录"删除，D4 改为"D4 脚本检查"，只列 `build_history_xlsx.py --check`、`md2docx.py` 检查、数字台账比对、`check_delivery.py`，统一"跑脚本，不通过就改到通过"。
+- `standards/审稿清单.md` 改为"交付硬规则清单"：每条写"必须是什么样"，有脚本的写脚本名；⑩ 每个重要轮次有一张股价走势 + 阶段图，⑫ 报告每张数据图在总览上有对应原生图，⑬ 首页按 Excel 规范建。
+- `standards/Excel规范.md`：删 0a 第 6 条五项读回、第 5 节 E1–E12 表、2.3a 锁 4"建后读回断言"（六道锁 → 五道锁）及全部 E 编号引用；`templates/图表总览模板.json` 删 `verify`、`lock4_postBuildAssert`。
+- `standards/格式规范.md` 删第 15 节全规格审阅；全仓删"写进自检""写进交付说明一句话""内容已审""自查结果"等措辞。
+- `scripts/check_delivery.py`：第 7、8 项与本地 L3 不再要求或检查"自检"文件（`REQUIRED`、`DOC_KEYS` 去掉"自检"），文档字符串改"不通过就按输出改到通过"；`tests/fixtures/check_delivery_good.json` 删自检条目，测试相应调整。其余检查不动。
+- D6 交叉审核保留，入口改为从留档复用部分找报告和表格；模式 R 第 7 步改"D4 脚本检查重跑"。
+
+### 全面精简
+原则：给好框架，不给 AI 灌废话；每条规则一句话写"做什么"，理由、历史、来由只在 CHANGELOG 与 LESSONS；同一件事只在一处写，别处一句指针。
+- `research-sop/SKILL.md`：版本行只留版本号与 CHANGELOG 指针（删历版"要点仍有效"）；D1–D5 的交付格式、本地不上传、命名、上传转换合成 D5"交付"一处；"常见陷阱"删除（已成规则的并入正文）；"写作与排版规范"与格式规范第 2 节重复的只留指针，其余压成"写作补充规则"；删"附：历史数据 Excel 规格独立副本"（正本 `templates/financial_history_spec.md`）；与 sellside-valuation-audit 分工表压成两行。
+- `research-sop/standards/格式规范.md`：删第 14 节"参数变更必须数据化"、第 15 节、第 16 节修订记录（格式规范修订记录见历史版本）；各"数据规范"表压成一行一条的规则，保留节号与 G/B/A/F/H/N/S/L/C/W/T/V/WB 编号；开头长说明压成一句。
+- 删 `research-sop/PROMPT.md` 与根目录 `PROMPT.md`（对话版翻版，已不同步）；只能对话的 AI 直接粘贴 SKILL.md，README 与两份 SKILL.md 引用同步。
+- `research-sop/standards/转换后修补清单.md`：只留上传与"丢什么 → 怎么补"。
+- `research-sop/standards/Excel规范.md`：删第 6 节"样板差异"与附录"样板实际布局"，原第 7 节改为第 6 节。
+- research-prompt：三份题型模板共有段落移进 `templates/任务书模板.md`，题型模板只留差异，"自检加查项"改为"本题型加项"规则；`SKILL.md` 删解释与历史。`gowork/SKILL.md` 规则条目保留，删解释。
+- 删无任何引用的模板 `templates/issue_report.md`、`research-sop/templates/feedback_log.md`；删本地 `research-sop/scripts/__pycache__`（`.gitignore` 已含 `__pycache__/`）。
+- 测试新增：research-sop 下无 `trail_selfcheck`、`自检九问`、`写进自检`；`research-sop/PROMPT.md` 不存在；`research-sop/SKILL.md` ≤ 20000、`格式规范.md` ≤ 15000（`wc -c`）。
+
+精简前后（字节，`wc -c`；精简前为 a942f0a）：
+
+| 文件 | 精简前 | 精简后 |
+|---|---:|---:|
+| research-sop/SKILL.md | 65507 | 19899 |
+| research-sop/PROMPT.md | 36367 | 删除 |
+| PROMPT.md | 4774 | 删除 |
+| research-sop/standards/格式规范.md | 78608 | 12724 |
+| research-sop/standards/转换后修补清单.md | 14056 | 2534 |
+| research-sop/standards/Excel规范.md | 25340 | 20563 |
+| research-sop/standards/审稿清单.md | 4762 | 2669 |
+| research-sop/templates/trail_selfcheck.md | 6198 | 删除 |
+| research-prompt/SKILL.md | 5347 | 3213 |
+| research-prompt/templates/任务书模板.md | 2158 | 2308 |
+| research-prompt/templates/题型_公司档案.md | 12884 | 6746 |
+| research-prompt/templates/题型_行业.md | 4495 | 1748 |
+| research-prompt/templates/题型_主题.md | 4171 | 1446 |
+| gowork/SKILL.md | 3383 | 3060 |
+
+## research-prompt 0.3.1 — 2026-11-07：审稿清单计数同步
+随 research-sop 0.21.0：`templates/任务书模板.md` 与三份题型模板里审稿清单由"十二条"改为"十三条"，SKILL.md 版本行改 0.3.1。同版随 research-sop 0.21.0"取消 AI 自检""全面精简"：题型模板共有段落移进任务书模板、题型只留差异，"自检加查项"改为"本题型加项"，SKILL.md 删解释与历史。
+
 ## 0.20.0 — 2026-11-07：规范层与类型层解耦
 起因：research-sop `SKILL.md` 把"怎么研究、怎么写、怎么交付"（规范层）和"某种报告该写什么"（类型层）混在一个文件里；类型层只覆盖公司、行业、主题三种报告，补充研究报告这类新题型套不上，要加就得改 research-sop。0.15.0 起这些段落已标"内容性建议，待迁入 research-prompt 模板库"，本版搬完。只搬不改义，规则本身不变；脚本一行不改，`standards/` 不改。
 1. 新增 research-prompt 题型模板三份，放 `research-prompt/templates/`（与任务书模板同目录；体例照 Drive 任务书模板库的周期全景模板，九节任务书骨架，类型层内容放"一、目标""二、范围""三、交付物""六、已定设计""八、验收标准"）：`题型_公司档案.md`、`题型_行业.md`、`题型_主题.md`。每份只写读者要能回答的问题、章节与每章讲什么、篇幅、图表数量与分配、底稿件数与特有台账、默认口径里随类型变的项、自检加查项；格式、出处记法、交付写"照 research-sop"。

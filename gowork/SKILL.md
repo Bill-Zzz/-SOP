@@ -21,18 +21,18 @@ description: "开工规矩：收到任务先复述五项确认再动手；设计
 ## 3. 具体操作看模型
 先看系统提示里自己是哪个模型。具体操作 = 改文件、git、跑脚本、动 Drive、写或更新 skill、贴卡片全文。
 
-- 高于 Opus：只设计和机械验收（格式、追溯、交付）；内容由用户审。遇到具体操作先提醒用户换到 Opus；用户不换就交给 Opus 子 Agent。
+- 高于 Opus：只设计和审稿；具体操作先提醒用户换到 Opus，不换就交给 Opus 子 Agent。
 - Opus 或更低：直接做。大批量、耗时长的活仍可交给 Opus 子 Agent。
 
 ## 4. 交给子 Agent 时
 - 任务书写：目标、要读的文件路径、已定设计（照做不改）、不做什么、收尾方式。只要摘要回复，不贴全文。
-- 任务书里“放在哪、叫什么”只能引用规范与检查脚本（Drive 入口文件的“工作区任务文件夹布局与交付清单”、research-sop 的 `standards/存储规范.md`），不得自写目录结构或排除规范要求的文件；交付到 Drive 后必须跑 `research-sop/scripts/check_delivery.py --drive <路径>`，结果写进自检。
-- 不限一个子 Agent。几件事互不依赖、不改同一批文件时，视情况同时开多个并行做，各自一份任务书，最后由我汇总对账。有先后依赖的仍按顺序来。
+- 任务书里“放在哪、叫什么”只引用 Drive 入口文件的“工作区任务文件夹布局与交付清单”与 research-sop 的 `standards/存储规范.md`，不自写目录结构；交付到 Drive 后跑 `research-sop/scripts/check_delivery.py --drive <路径>`，不通过就改到通过。
+- 互不依赖、不改同一批文件的活可同时开多个子 Agent，各一份任务书，最后由我汇总对账；有先后依赖的按顺序。
 - PR 只建不合并；用户说合并后我用 `gh api repos/…/pulls/<n>/merge -X PUT` 合。
 - 同一仓库同一时间只一个执行者。Agent 中断后用 SendMessage 让它对账后接着做。
 - 只能在用户自己电脑上做的数据活（富途导出等）：给用户一段可粘贴的任务文字，由用户交给那台电脑上的 AI。
 
 ## 5. 环境
-- SOP 仓库：GitHub `Bill-Zzz/-SOP`（用自己的 fork 就换成自己的仓库），克隆位置以本机为准。research-sop/ 只管研究方法；改版本同时改 VERSION、CHANGELOG、LESSONS，跑 `bash tests/run_tests.sh`。环境禁用 `gh pr create` 时，用 `gh api …/pulls -X POST`。
+- SOP 仓库：GitHub `Bill-Zzz/-SOP`（或自己的 fork）。改版本同时改 VERSION、CHANGELOG、LESSONS，跑 `bash tests/run_tests.sh`。环境禁用 `gh pr create` 时用 `gh api …/pulls -X POST`。
 - 用 Google Drive 时，按 Drive 里的规则做。
-- 用户审报告是口头让做它的 AI 改；不满意多半是 SOP 的问题，改 SOP 后按底稿局部重跑。
+- 用户对报告不满意时改 SOP，再按底稿局部重跑。
