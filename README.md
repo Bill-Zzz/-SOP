@@ -1,11 +1,12 @@
 # 研究 SOP
 
-用 AI 做股票与行业研究的一套方法、模板和脚本。仓库里有四个 skill，可以单独用，也可以串起来用。
+用 AI 做股票与行业研究的一套方法、模板和脚本。仓库里有五个 skill，可以单独用，也可以串起来用。
 
 | skill | 位置 | 用来做什么 |
 |---|---|---|
 | sellside-valuation-audit | 根目录 `SKILL.md` | 估值：从本地研报库读研报，和你讨论方向后建模型、写报告；核查已有报告的出处；新研报入库后滚动更新 |
 | research-sop | `research-sop/` | 研究：主题、行业、公司三层。全自动，不停下讨论；未来只给方向和量级，不给点预测 |
+| research-delivery | `research-delivery/` | 格式与交付：把写好的 .md、图片、数据表做成 Google 文档与表格，上传、补目录页码、交付核对；只改格式不改内容，可交给便宜的 AI 或 Codex |
 | research-prompt | `research-prompt/` | 立项：盘料、和你谈出角度，写一份任务书交给执行研究的 AI |
 | gowork | `gowork/` | 开工规矩：先复述确认再动手，按模型分工，子 Agent 任务书与收尾 |
 
@@ -26,11 +27,14 @@ scripts/          估值 skill 的脚本：研报库索引与检索、PDF 抽取
 templates/        估值 skill 的模板：阅读包、研究方向、模型规格、报告大纲、出处台账、修订记录、复盘
 examples/crwv/    CoreWeave 案例
 research-sop/
-  SKILL.md              研究方法
+  SKILL.md              研究方法（只写判断与写作）
+  工单/                 机械步骤：工单A_取数建表、工单B_数字抽查
   standards/            格式规范、Excel 规范（图表总览首页）、存储规范、审稿清单（交付硬规则）、转换后修补清单
   templates/            报告外壳 report_shell.md，台账、来源清单、结论卡等留档模板、图表总览模板
-  scripts/              build_history_xlsx.py 历史数据 Excel；md2docx.py 报告转 .docx；check_delivery.py 交付检查
+  scripts/              build_history_xlsx.py 历史数据 Excel；check_numbers.py 正文数字比对；md2docx.py 报告转 .docx；check_delivery.py 交付检查
   prompts/              发给执行 AI 的一句话提示词模板
+research-delivery/
+  SKILL.md              格式与交付（工单 C）；交接单模板.md
 research-prompt/
   SKILL.md              立项方法
   templates/            任务书模板（各题型共用部分）；题型模板 题型_公司档案 / 题型_行业 / 题型_主题（只写各类报告的差异）；通过的任务书入 Google Drive 任务书模板库
@@ -56,11 +60,12 @@ bash tests/run_tests.sh              # 回归测试，会列出跳过的项
 mkdir -p ~/.claude/skills
 ln -s "$(pwd)"                 ~/.claude/skills/sellside-valuation-audit
 ln -s "$(pwd)/research-sop"    ~/.claude/skills/research-sop
+ln -s "$(pwd)/research-delivery" ~/.claude/skills/research-delivery
 ln -s "$(pwd)/research-prompt" ~/.claude/skills/research-prompt
 ln -s "$(pwd)/gowork"          ~/.claude/skills/gowork
 ```
 
-其他工具：Codex、Cursor 等克隆到工作区即可，会自动读 `AGENTS.md`。只能对话的 AI（ChatGPT、Gemini、Kimi 等）直接粘贴 `SKILL.md` 或 `research-sop/SKILL.md` 为系统提示。
+其他工具：Codex、Cursor 等克隆到工作区即可，会自动读 `AGENTS.md`；格式与交付这类机械活可以直接交给它们，见 `AGENTS.md` 末节。只能对话的 AI（ChatGPT、Gemini、Kimi 等）直接粘贴 `SKILL.md` 或 `research-sop/SKILL.md` 为系统提示。
 
 ## 怎么用
 **立项并研究：**

@@ -21,6 +21,8 @@
 #      先查 Drive，本地不留模板库副本；SKILL.md 与任务书模板不硬编码文件 ID、不含题型内容；
 #      任务书第七节有“要读的角度”，research-sop SKILL.md 有 D1 文献检索、D2 角度清单；
 #      题型模板（公司档案、行业、主题）齐，research-sop 无“待迁入”标注（0.20.0 解耦）
+#   9) check_numbers.py：正文数字对数据表与台账（tests/make_numbers_fixture.py 现场生成）；research-delivery、工单 A/B、
+#      AGENTS.md 指向齐，research-sop 不含格式与上传细节（0.22.0 机械活拆分）
 # 用法：bash tests/run_tests.sh   （在仓库根目录运行）
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -394,10 +396,13 @@ grep -q "^- ⑪ \`md2docx.py\`\"图表优先\"列出的数字墙、数值大表�
 if grep -n "审稿清单.md\` 九条" research-sop/SKILL.md research-prompt/templates/任务书模板.md; then
   echo "审稿清单已是十一条，不得再写九条"; exit 1
 fi
-grep -q '只拿到这一份文档的冷读者"来写：事实本身写清楚，读这一份就够。' research-sop/standards/格式规范.md \
-  || { echo "格式规范缺写法硬要求 5（写给冷读者）"; exit 1; }
+grep -q '只拿到这一份文档的冷读者"来写：事实本身写清楚，读这一份就够。' research-sop/SKILL.md \
+  || { echo "research-sop D3 缺写法硬要求 5（写给冷读者）"; exit 1; }
+if grep -q "冷读者" research-sop/standards/格式规范.md && grep -q '只拿到这一份文档的冷读者"来写' research-sop/standards/格式规范.md; then
+  echo "写法硬要求已移到 research-sop D3，格式规范只留指针"; exit 1
+fi
 grep -q "⑨ 写给冷读者" research-sop/standards/审稿清单.md
-echo "图表优先：md2docx 报出数字墙、数值大表、没有图的正文章且不影响退出码；V01–V05 写进格式规范（V05 硬门槛、V02 软门槛），审稿清单 ⑩ ⑪ 为规则；写法硬要求 5 写给冷读者在格式规范与审稿清单 ⑨ 里"
+echo "图表优先：md2docx 报出数字墙、数值大表、没有图的正文章且不影响退出码；V01–V05 写进格式规范（V05 硬门槛、V02 软门槛），审稿清单 ⑩ ⑪ 为规则；写法硬要求 5 写给冷读者在 research-sop D3 与审稿清单 ⑨ 里"
 
 echo "== 7. check_delivery.py（离线，lsjson 样例） =="
 python3 research-sop/scripts/check_delivery.py --help | grep -q -- "--drive"
@@ -541,6 +546,33 @@ grep -q "第五节：股价行为画像与 σ 门槛" research-prompt/templates/
 if grep -n "^## 公司报告七节\|^### 第五节：股价行为画像" research-sop/SKILL.md; then echo "公司报告七节与 σ 门槛已迁到公司档案题型模板"; exit 1; fi
 echo "题型模板：公司档案、行业、主题三份齐，research-sop 无“待迁入”标注，七节与 σ 门槛只在公司档案模板"
 echo "research-prompt：frontmatter 与任务书模板齐；任务书第七节有“要读的角度”，research-sop 有文献检索与角度清单；模板库以 Drive <研究库>/90_任务书模板库/ 为准、先查 Drive，本地不留副本；SKILL.md 无文件 ID、无题型内容"
+
+echo "== 9. check_numbers.py 与机械活拆分 =="
+python3 tests/make_numbers_fixture.py "$TMP/num"
+python3 research-sop/scripts/check_numbers.py tests/fixtures/md2docx_sample.md --xlsx "$TMP/num/hist.xlsx" --ledger "$TMP/num/数字台账.csv" > "$TMP/cn_good.txt" \
+  || { cat "$TMP/cn_good.txt"; echo "合规样例应全部命中、退出码 0"; exit 1; }
+grep -q "数字比对：正文数字 19 个，命中 19 个（台账 6、数据表 13、csv 0），未命中 0 个" "$TMP/cn_good.txt" || { cat "$TMP/cn_good.txt"; exit 1; }
+grep -q "1 个公式没有缓存值（先重算）" "$TMP/cn_good.txt"
+# 改错一个数、加入不该抽的数（年份、日期、图号、版本、FY、σ、交易日、指数名、小整数），只应报出改错的那个
+cp tests/fixtures/md2docx_sample.md "$TMP/cn_bad.md"
+sed -i 's/52.9 亿美元，毛利率/52.6 亿美元，毛利率/' "$TMP/cn_bad.md"
+sed -i 's/^最大的问题是订阅续约率能否维持；判断见第一章。/最大的问题是订阅续约率能否维持；判断见第一章。FY2025 起按 2025-03-31 口径，单日 3σ、250 个交易日、2.5σ 门槛，对标 S\&P 500，见图 1 与表 1、第 2.1 节，V1.0 版，近 5 年 3 家对手。/' "$TMP/cn_bad.md"
+if python3 research-sop/scripts/check_numbers.py "$TMP/cn_bad.md" --xlsx "$TMP/num/hist.xlsx" --ledger "$TMP/num/数字台账.csv" > "$TMP/cn_bad.txt"; then
+  echo "改错的数字应报未命中、退出码 1"; exit 1
+fi
+grep -q "未命中 1 个" "$TMP/cn_bad.txt" || { cat "$TMP/cn_bad.txt"; echo "只应报出改错的 52.6"; exit 1; }
+grep -q "「1.1　结论」｜.*｜52.6" "$TMP/cn_bad.txt"
+set +e; python3 research-sop/scripts/check_numbers.py tests/fixtures/md2docx_sample.md > /dev/null 2>&1; rc=$?; set -e
+[ "$rc" -eq 2 ] || { echo "没有候选值来源时应退出码 2"; exit 1; }
+# 机械活拆分（0.22.0）：格式与交付独立成 research-delivery，取数与抽查是 research-sop 工单
+test -s research-delivery/SKILL.md && grep -q "^name: research-delivery$" research-delivery/SKILL.md
+test -s research-delivery/交接单模板.md
+test -s research-sop/工单/工单A_取数建表.md && test -s research-sop/工单/工单B_数字抽查.md
+grep -q "research-delivery/SKILL.md" AGENTS.md || { echo "AGENTS.md 须指向 research-delivery"; exit 1; }
+if grep -n "research-sop/SKILL.md" research-delivery/SKILL.md; then echo "research-delivery 自成一体，不引用 research-sop/SKILL.md"; exit 1; fi
+if grep -n "图表可读性\|转换后修补清单\|xlsx_patch\|rclone" research-sop/SKILL.md; then echo "格式、转换、上传细节已移到 research-delivery"; exit 1; fi
+grep -q "check_numbers.py" research-sop/SKILL.md && grep -q "check_numbers.py" research-sop/工单/工单B_数字抽查.md
+echo "check_numbers：合规样例 19/19 命中（台账 6、数据表 13）、报公式缺缓存；改错的数报出且退出码 1，年份、日期、图号、版本、FY、σ、交易日、指数名、小整数不抽；无候选值退出码 2；research-delivery、交接单模板、工单 A/B 齐，AGENTS.md 指向 research-delivery，research-sop 不含格式与上传细节"
 echo
 if [ ${#SKIPPED[@]} -gt 0 ]; then
   echo "已通过，但以下测试被跳过："
