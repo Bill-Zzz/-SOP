@@ -31,7 +31,7 @@ research-sop/
   工单/                 机械步骤：工单A_取数建表、工单B_数字抽查
   standards/            格式规范、Excel 规范（图表总览首页）、存储规范、审稿清单（交付硬规则）、转换后修补清单
   templates/            报告外壳 report_shell.md，台账、来源清单、结论卡等留档模板、图表总览模板
-  scripts/              build_history_xlsx.py 历史数据 Excel；check_numbers.py 正文数字比对；md2docx.py 报告转 .docx；check_delivery.py 交付检查
+  scripts/              build_history_xlsx.py 历史数据 Excel；check_numbers.py 正文数字比对；check_charts.py 图表防乱；md2docx.py 报告转 .docx；check_delivery.py 交付检查
   prompts/              发给执行 AI 的一句话提示词模板
 research-delivery/
   SKILL.md              格式与交付（工单 C）；交接单模板.md

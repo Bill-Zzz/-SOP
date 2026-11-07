@@ -14,7 +14,8 @@
 7. `standards/审稿清单.md`：开头加分工一句；④ 改为 `check_numbers.py`；⑨ 指向 research-sop D3。
 8. gowork：第 3 节加"研究任务按推理档分工"与"省 token"；第 4 节放在哪、怎么上传只写"按 research-delivery"。research-prompt：立项不读格式规范；任务书模板第六节加"分档"一行。
 9. `AGENTS.md` 末节指向 research-delivery 与工单 A/B，供 Codex 接活；README 加 research-delivery。
-10. `tests/run_tests.sh` 第 9 节：`check_numbers.py` 合规样例全部命中、改错的数报出、年份日期图号版本等不抽、无候选值退出码 2；research-delivery、交接单模板、工单 A/B 存在，AGENTS.md 指向，research-delivery 不引用 research-sop/SKILL.md，research-sop 不含图表可读性、转换后修补清单、xlsx_patch、rclone；冷读者断言改查 research-sop D3。脚本 `md2docx.py`、`check_delivery.py`、`build_history_xlsx.py` 一行不改。
+10. 图表防乱（用户验收：日数据几千个点挤在半宽图里、横轴标签竖排挤满、折线带圆点、一行三张越界）：新脚本 `research-sop/scripts/check_charts.py` 读工作簿 xlsx 里每张原生图，G1 一行最多两张、G2 不重叠、G3 宽 ≥ 560 px 且点数 > 200 的独占一行 ≥ 1100 px、G4 点数 ≤ 图宽 ÷ 3、G5 横轴非空标签折线 ≤ 15 柱图 ≤ 20、G6 折线无标记点、G7 系列数、G8 图内标题不带图号；research-delivery C3 写成"图表防乱"硬规则（降频到周末 / 月末 / 季末、标签列每 N 年写一次年份），本地与 Google 导出各跑一次，再导出 PDF 看一眼。审稿清单 ⑫、Excel 规范 2.3 同步。
+11. `tests/run_tests.sh` 第 9 节：`check_numbers.py` 合规样例全部命中、改错的数报出、年份日期图号版本等不抽、无候选值退出码 2；research-delivery、交接单模板、工单 A/B 存在，AGENTS.md 指向，research-delivery 不引用 research-sop/SKILL.md，research-sop 不含图表可读性、转换后修补清单、xlsx_patch、rclone；冷读者断言改查 research-sop D3；`check_charts.py` 合规样例全过、不合规样例逐项报出（`tests/make_charts_fixture.py`）。脚本 `md2docx.py`、`check_delivery.py`、`build_history_xlsx.py` 一行不改。
 
 ## 0.21.0 — 2026-11-07：图表总览交互首页规范（Excel 规范 V1.6）
 
