@@ -1,6 +1,6 @@
 ---
 name: "gowork"
-description: "开工规矩：收到任务先复述五项确认再动手；设计时先问后答、减法优先；按当前模型决定谁做具体操作（高于 Opus 只设计和审稿，交给 Opus 子 Agent）；子 Agent 任务书格式与收尾方式，互不依赖的活可多开子 Agent 并行。用户的任何新任务、改 skill、研究报告、Drive 操作开工前先按本 skill 走。"
+description: "开工规矩：收到任务先复述五项确认再动手；设计时先问后答、减法优先；按当前模型决定谁做具体操作（高于 Opus 只设计和审稿，交给 Opus 子 Agent）；高推理只做判断与写作，机械活按工单派低档；子 Agent 任务书格式与收尾方式，互不依赖的活可多开子 Agent 并行。用户的任何新任务、改 skill、研究报告、Drive 操作开工前先按本 skill 走。"
 ---
 
 # 开工（gowork）
@@ -24,9 +24,20 @@ description: "开工规矩：收到任务先复述五项确认再动手；设计
 - 高于 Opus：只设计和审稿；具体操作先提醒用户换到 Opus，不换就交给 Opus 子 Agent。
 - Opus 或更低：直接做。大批量、耗时长的活仍可交给 Opus 子 Agent。
 
+### 研究任务按推理档分工
+- 高推理（本会话）只做判断与写作。机械活是工单，按本轮分档自己做或派出去；默认：取数建表（research-sop 工单 A）Opus 中推理；数字抽查（工单 B）Opus 低推理；格式与交付（research-delivery）Opus 中推理，可改 Sonnet 或 Codex；入库（research-library）Sonnet。
+- 分档由用户在任务书"已定设计"或派活那句话里定（"本轮格式自己做""C 用 Codex"），没写按默认。派 Claude 子 Agent 时用 `model` 与 `effort` 参数写明档位。
+- 交 Codex 的：给它工单或交接单路径，它在仓库里读 `AGENTS.md` 找到规矩。
+
+### 省 token
+- 每篇最多四张工单，整阶段派，不按小步派；几步能完成的活不派。
+- 工单只给文件路径，不转述数字；回复只要摘要与打回单。
+- 高推理不读脚本原始输出、不读格式规范、不读 Drive 目录。
+- 打回后只改、只复查打回的位置，不重写、不重查全篇。
+
 ## 4. 交给子 Agent 时
 - 任务书写：目标、要读的文件路径、已定设计（照做不改）、不做什么、收尾方式。只要摘要回复，不贴全文。
-- 任务书里“放在哪、叫什么”只引用 Drive 入口文件的“工作区任务文件夹布局与交付清单”与 research-sop 的 `standards/存储规范.md`，不自写目录结构；交付到 Drive 后跑 `research-sop/scripts/check_delivery.py --drive <路径>`，不通过就改到通过。
+- 任务书里“放在哪、叫什么、怎么上传”只写“按 research-delivery”，不自写目录结构；交付核对由 research-delivery 跑 `check_delivery.py` 到通过。
 - 互不依赖、不改同一批文件的活可同时开多个子 Agent，各一份任务书，最后由我汇总对账；有先后依赖的按顺序。
 - PR 只建不合并；用户说合并后我用 `gh api repos/…/pulls/<n>/merge -X PUT` 合。
 - 同一仓库同一时间只一个执行者。Agent 中断后用 SendMessage 让它对账后接着做。

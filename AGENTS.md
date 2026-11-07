@@ -14,3 +14,9 @@
 4. 有争议的口径不擅自决定，写清两种结果的影响后交给用户。
 5. 研报 PDF、抽取文本和索引（`sva_index/`）不要提交到仓库。
 6. 每次运行结束都要写复盘，把修改建议追加到 `LESSONS.md`；经用户确认后才修改 SKILL，修改时同步更新 `VERSION`、`CHANGELOG.md`，并通过 `bash tests/run_tests.sh`。
+
+## 研究报告的机械工单（research-sop 0.22.0 起）
+接到下面三类活时，只读对应文件照做，不读 `research-sop/SKILL.md`；不改报告的数字和意思，内容问题写打回单：
+- 格式、转换、上传、补目录页码、交付核对（交接单 `交接单.md`）：`research-delivery/SKILL.md`
+- 取数建表：`research-sop/工单/工单A_取数建表.md`
+- 数字抽查：`research-sop/工单/工单B_数字抽查.md`

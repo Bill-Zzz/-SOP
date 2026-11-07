@@ -2,6 +2,21 @@
 
 版本号规则：大版本.小版本.修订。流程或产出结构变化升小版本；脚本修复、陷阱补充升修订号；不兼容的重构升大版本。
 
+## 0.22.0 — 2026-11-07：判断与机械拆开（research-delivery、工单 A/B、check_numbers.py）
+
+原则：高推理只做判断与写作；照规则执行的活写成工单，每轮按分档自己做或派给低档执行者（Opus 低 / 中推理子 Agent、Sonnet、Codex）。省 token 的地方是三处：高推理上下文不再装格式规范与一轮轮脚本输出；格式返工在独立的便宜上下文里循环；手工对台账换成脚本。起因见 `LESSONS.md` 同日一条。
+1. 新增技能 `research-delivery/`（工单 C 格式与交付）：转换、表格排版、图表与图表工作簿首页、上传与命名、转换后修补、`check_delivery.py`、索引更新；自成一体，不引用 research-sop 的 SKILL.md；只改格式不改内容，内容类问题写打回单。附 `交接单模板.md`，写报告的执行者写完内容后填。原 research-sop 的"图表可读性"、D5 格式与上传、"存储与格式规范"、写作补充规则里的表格版式移到这里。
+2. 新增 `research-sop/工单/工单A_取数建表.md`（富途导出、`build_history_xlsx.py`、σ 与超额收益、研报库检索候选、文献全文、10-K 等下载、来源清单）与 `工单B_数字抽查.md`（核心行 + 随机 5 行对回原始出处）。
+3. 新脚本 `research-sop/scripts/check_numbers.py`：抽正文数字，对历史数据表、图表数据表与数字台账，允许四舍五入与 %、万、亿换算，只列未命中；取代 D4 原来没有脚本、由 AI 手工做的"数字台账比对"。
+4. 数字台账改为"边写边记"：只记历史数据表之外的数（来源编号、既有研究、计算、口径），表内的数由脚本对；`templates/trail_numbers.csv` 出处类型改为 来源编号 / 既有研究 / 计算 / 口径。
+5. D6 交叉审核：从"默认不做"改为 `check_numbers.py` 为 0 后默认做一次工单 B（低推理）；前五篇记"有误几处"，连续为零由用户决定关掉。
+6. research-sop `SKILL.md`：新增"分工：判断与机械"（工单表与默认执行者、分档写法）；D1 改为接收工单 A 的产出；D4 改为 `check_numbers.py` + 打回单；D5 改为写交接单交 research-delivery；模式 R 的文件操作交 research-delivery。写法硬要求五条从格式规范第 2 节移入 D3（格式规范留一句指针）；格式规范第 7 节"图给可比较的原始序列"一条并入 D3 写法硬要求 4。
+7. `standards/审稿清单.md`：开头加分工一句；④ 改为 `check_numbers.py`；⑨ 指向 research-sop D3。
+8. gowork：第 3 节加"研究任务按推理档分工"与"省 token"；第 4 节放在哪、怎么上传只写"按 research-delivery"。research-prompt：立项不读格式规范；任务书模板第六节加"分档"一行。
+9. `AGENTS.md` 末节指向 research-delivery 与工单 A/B，供 Codex 接活；README 加 research-delivery。
+10. 图表防乱（用户验收：日数据几千个点挤在半宽图里、横轴标签竖排挤满、折线带圆点、一行三张越界）：新脚本 `research-sop/scripts/check_charts.py` 读工作簿 xlsx 里每张原生图，G1 一行最多两张、G2 不重叠、G3 宽 ≥ 560 px 且点数 > 200 的独占一行 ≥ 1100 px、G4 点数 ≤ 图宽 ÷ 3、G5 横轴非空标签折线 ≤ 15 柱图 ≤ 20、G6 折线无标记点、G7 系列数、G8 图内标题不带图号；research-delivery C3 写成"图表防乱"硬规则（降频到周末 / 月末 / 季末、标签列每 N 年写一次年份），本地与 Google 导出各跑一次，再导出 PDF 看一眼。审稿清单 ⑫、Excel 规范 2.3 同步。
+11. `tests/run_tests.sh` 第 9 节：`check_numbers.py` 合规样例全部命中、改错的数报出、年份日期图号版本等不抽、无候选值退出码 2；research-delivery、交接单模板、工单 A/B 存在，AGENTS.md 指向，research-delivery 不引用 research-sop/SKILL.md，research-sop 不含图表可读性、转换后修补清单、xlsx_patch、rclone；冷读者断言改查 research-sop D3；`check_charts.py` 合规样例全过、不合规样例逐项报出（`tests/make_charts_fixture.py`）。脚本 `md2docx.py`、`check_delivery.py`、`build_history_xlsx.py` 一行不改。
+
 ## 0.21.0 — 2026-11-07：图表总览交互首页规范（Excel 规范 V1.6）
 
 经 AAPL 副本验收后升至 Excel 规范 V1.6，本版一并收入：
