@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 自检：
+# 回归测试：
 #   1) CRWV 复现引擎与 Excel 对账
 #   2) 研报库索引 / 检索 / 阅读准备（含日期误判等回归测试）
 #   3) xlsx 修改流程：保留图表、公式、隐藏表；强制重算标记
@@ -12,14 +12,14 @@
 #      缺一页摘要报出；不合规样例（卷首元信息、第一章不是结论与概述、正文带 [R23475 p5]、来源行带编号、
 #      取舍 / 来源 / 修订说明在正文）逐项报出
 #      图表优先（格式规范第 7 节 V01–V05）：md2docx 软门槛提示数字墙、数值大表、没有图的正文章且不影响退出码；规则在规范、
-#      审稿清单 ⑩⑪、自检模板里
+#      审稿清单 ⑩⑪ 里
 #   7) check_delivery.py：用 rclone lsjson 样例 JSON（tests/fixtures/check_delivery_*.json）离线核对 Drive 布局、
 #      命名、格式，并核对本地 成品/、留痕/复用、复核；第 12 项 Google 文档目录二级条目带页码用导出文本样例
 #      （tests/fixtures/toc_good、toc_missing）与人工确认样例（toc_evidence_*.txt）测硬门槛；第 13 项图表工作簿结构
 #      （格式规范第 13.1 节）用 tests/make_workbook_fixture.py 现场生成的合规 / 不合规 xlsx 测硬门槛；不联网
 #   8) research-prompt：SKILL.md 有 frontmatter name、任务书模板在；任务书模板库指向 Drive <研究库>/90_任务书模板库/、
 #      先查 Drive，本地不留模板库副本；SKILL.md 与任务书模板不硬编码文件 ID、不含题型内容；
-#      任务书第七节有“要读的角度”，research-sop 有 D1 文献检索、D2 角度清单（SKILL.md 与 PROMPT.md）；
+#      任务书第七节有“要读的角度”，research-sop SKILL.md 有 D1 文献检索、D2 角度清单；
 #      题型模板（公司档案、行业、主题）齐，research-sop 无“待迁入”标注（0.20.0 解耦）
 # 用法：bash tests/run_tests.sh   （在仓库根目录运行）
 set -euo pipefail
@@ -384,28 +384,26 @@ grep -q "图表优先（只提示，不影响退出码；格式规范第 7 节 V
   || { echo "图表优先提示不对"; cat "$TMP/cf.txt"; exit 1; }
 grep -q "「二、历史」：没有图" "$TMP/cf.txt"
 grep -q "「二、历史」的表：45 个纯数值单元格" "$TMP/cf.txt"
-for f in research-sop/standards/格式规范.md research-sop/SKILL.md research-sop/PROMPT.md; do
+for f in research-sop/standards/格式规范.md research-sop/SKILL.md; do
   grep -q "图表优先" "$f" || { echo "$f 缺图表优先规则"; exit 1; }
 done
-grep -q "^| V05 | key_round_price_phase_chart | \*\*硬门槛\*\*" research-sop/standards/格式规范.md
-grep -q "^| V02 | number_wall | 软门槛" research-sop/standards/格式规范.md
-grep -q "⑩ \*\*（硬性）重要轮次的\"股价走势 + 阶段\"图\*\*" research-sop/standards/审稿清单.md
-grep -q "⑪ \*\*（软性）图表优先提示已逐条处理\*\*" research-sop/standards/审稿清单.md
-grep -q "⑩ （硬性）重要轮次" research-sop/templates/trail_selfcheck.md && grep -q "⑪ （软性）图表优先提示处理" research-sop/templates/trail_selfcheck.md
-if grep -n "审稿清单.md\` 九条" research-sop/SKILL.md research-sop/PROMPT.md research-sop/templates/trail_selfcheck.md research-prompt/templates/任务书模板.md; then
+grep -q "^- V05 \*\*硬门槛\*\*" research-sop/standards/格式规范.md
+grep -q "^- V02 软门槛" research-sop/standards/格式规范.md
+grep -q "^- ⑩ 历史按轮次组织的报告，每个重要轮次有一张股价走势 + 阶段图" research-sop/standards/审稿清单.md
+grep -q "^- ⑪ \`md2docx.py\`\"图表优先\"列出的数字墙、数值大表、没有图的正文章，逐条改成图或删到关键节点" research-sop/standards/审稿清单.md
+if grep -n "审稿清单.md\` 九条" research-sop/SKILL.md research-prompt/templates/任务书模板.md; then
   echo "审稿清单已是十一条，不得再写九条"; exit 1
 fi
-for f in research-sop/standards/格式规范.md research-sop/SKILL.md research-sop/PROMPT.md; do
-  grep -q '只拿到这一份文档的冷读者"来写：事实本身写清楚，读这一份就够。' "$f" || { echo "$f 缺写法硬要求 5（写给冷读者）"; exit 1; }
-done
-grep -q "⑨ 按冷读者通读一遍" research-sop/standards/审稿清单.md
-echo "图表优先：md2docx 报出数字墙、数值大表、没有图的正文章且不影响退出码；V01–V05 写进格式规范（V05 硬门槛、V02 软门槛），审稿清单 ⑩ 硬性、⑪ 软性，自检模板同步，审稿清单计数改为十一条；写法硬要求 5 写给冷读者在规范、SKILL、PROMPT 与审稿清单 ⑨ 里"
+grep -q '只拿到这一份文档的冷读者"来写：事实本身写清楚，读这一份就够。' research-sop/standards/格式规范.md \
+  || { echo "格式规范缺写法硬要求 5（写给冷读者）"; exit 1; }
+grep -q "⑨ 写给冷读者" research-sop/standards/审稿清单.md
+echo "图表优先：md2docx 报出数字墙、数值大表、没有图的正文章且不影响退出码；V01–V05 写进格式规范（V05 硬门槛、V02 软门槛），审稿清单 ⑩ ⑪ 为规则；写法硬要求 5 写给冷读者在格式规范与审稿清单 ⑨ 里"
 
 echo "== 7. check_delivery.py（离线，lsjson 样例） =="
 python3 research-sop/scripts/check_delivery.py --help | grep -q -- "--drive"
 mkdir -p "$TMP/task/成品" "$TMP/task/留痕/ACME/复用" "$TMP/task/留痕/ACME/复核"
 touch "$TMP/task/成品/ACME_库存周期研究_20261105_V1.0.md" "$TMP/task/留痕/ACME/复用/结论卡.md" \
-  "$TMP/task/留痕/ACME/复用/来源清单.csv" "$TMP/task/留痕/ACME/复用/数字台账.csv" "$TMP/task/留痕/ACME/复核/自检.md"
+  "$TMP/task/留痕/ACME/复用/来源清单.csv" "$TMP/task/留痕/ACME/复用/数字台账.csv"
 python3 tests/make_workbook_fixture.py "$TMP/wb" >/dev/null
 python3 research-sop/scripts/check_delivery.py --lsjson tests/fixtures/check_delivery_good.json --local "$TMP/task" \
   --toc-text tests/fixtures/toc_good --workbook-dir "$TMP/wb/good" | tee "$TMP/cd_good.txt"
@@ -423,18 +421,19 @@ fi
 cat "$TMP/cd_bad.txt"
 for s in "结果：3/16 通过" "13. 通过    图表工作簿：语义页名、图表总览看板、图表计算、来源页（硬性）（没有配套图表工作簿，不适用）" "      - 20261105_库存周期_v1_ClaudeCode" \
     "ACME_库存周期研究_20261105_v1：取不到文档文本，也没有 --toc-evidence 人工确认（缺证据不通过）" "      - ACME_库存周期研究_20261105_v1" \
-    "ACME_图表数据_20261105_V1.0.xlsx：xlsx 原件" "      - 报告/" "底稿/ACME/ 缺 自检" \
+    "ACME_图表数据_20261105_V1.0.xlsx：xlsx 原件" "      - 报告/" \
     "底稿/ACME/结论卡.md：结论卡应为 Google 文档，现为 md 原件" "底稿/ACME/数字台账.csv：数字台账应为 Google 表格，现为 csv 原件" \
     "      - 底稿/ACME/图02_分部.png" "底稿/图片/XYZ/：没有同名的 底稿/XYZ/" "底稿/图片/图03_现金流.png：应放进 底稿/图片/<篇>/" \
     "      - 底稿/ACME/raw/" "留痕/ACME/ 缺 复核/" "留痕/ACME/ 缺 数字台账" \
-    "底稿/共用/ 缺 结论卡、自检、来源清单、数字台账" "底稿/共用数据/价格序列.csv：csv 原件" \
+    "底稿/共用/ 缺 结论卡、来源清单、数字台账" "底稿/共用数据/价格序列.csv：csv 原件" \
     "底稿/ACME_底稿说明_补充.docx：应放进 底稿/<篇>/" "底稿/数字台账.xlsx：应放进 底稿/<篇>/"; do
   grep -qF -- "$s" "$TMP/cd_bad.txt" || { echo "缺少预期输出：$s"; exit 1; }
 done
-if grep -q "共用数据/ 缺\|ACME_底稿说明_20261105" "$TMP/cd_bad.txt"; then echo "共用数据/ 不按篇要求四类、第一份底稿说明应放行"; exit 1; fi
+if grep -q "自检" "$TMP/cd_good.txt" "$TMP/cd_bad.txt"; then echo "check_delivery 不再要求或检查“自检”文件"; exit 1; fi
+if grep -q "共用数据/ 缺\|ACME_底稿说明_20261105" "$TMP/cd_bad.txt"; then echo "共用数据/ 不按篇要求三类、第一份底稿说明应放行"; exit 1; fi
 if grep -q "来源清单.xlsx" "$TMP/cd_bad.txt"; then echo "无元数据、Size -1 的 .xlsx 应认作 Google 表格"; exit 1; fi
 if grep -q "10-K_2025.pdf\|IR页面存档" "$TMP/cd_good.txt"; then echo "来源/ 里的原件应原样放行"; exit 1; fi
-echo "check_delivery：合规样例（含底稿说明、共用数据/、合规图表工作簿）16/16 通过；不合规样例逐项报出命名、原件、自创文件夹、底稿/ 根下散文件、缺件（含 共用数据/ 之外的文件夹）、格式（含 共用数据/）、PNG 位置、raw、目录缺证据、本地缺 复核/ 与数字台账，退出码 1"
+echo "check_delivery：合规样例（含底稿说明、共用数据/、合规图表工作簿）16/16 通过；不合规样例逐项报出命名、原件、自创文件夹、底稿/ 根下散文件、缺件（结论卡、来源清单、数字台账三类，含 共用数据/ 之外的文件夹；不再要求自检）、格式（含 共用数据/）、PNG 位置、raw、目录缺证据、本地缺 复核/ 与数字台账，退出码 1"
 # 第 12 项：Google 文档目录二级条目必须有页码（硬性；缺页码、无目录段、缺证据都不通过）
 CD="python3 research-sop/scripts/check_delivery.py --lsjson tests/fixtures/check_delivery_good.json --workbook-dir $TMP/wb/good"
 toc_fail() {  # 用法：toc_fail 期望输出 -- 额外参数…
@@ -484,22 +483,31 @@ $WB --report 半导体_存储周期研究_20261105 > "$TMP/cd_wb.txt"   # 该研
 grep -q "13. 通过    图表工作簿：语义页名、图表总览看板、图表计算、来源页（硬性）（没有配套图表工作簿，不适用）" "$TMP/cd_wb.txt"
 $WB --report ACME_库存周期研究_20261105_V1.0 --workbook-dir "$TMP/wb/good" > "$TMP/cd_wb.txt"   # 同研究对象、同版本号的表格被挑中
 grep -q "（1 份；ACME_图表数据_20261105_V1.0：" "$TMP/cd_wb.txt"
-for f in research-sop/standards/格式规范.md research-sop/SKILL.md research-sop/PROMPT.md research-sop/templates/financial_history_spec.md; do
+for f in research-sop/standards/格式规范.md research-sop/SKILL.md research-sop/templates/financial_history_spec.md; do
   grep -q "13.1" "$f" || { echo "$f 缺格式规范第 13.1 节图表工作簿结构的引用"; exit 1; }
 done
-grep -q "^### 13.1 研究报告图表工作簿结构：数据规范" research-sop/standards/格式规范.md
-grep -q "^| WB02 | overview_dashboard | \*\*硬门槛\*\*" research-sop/standards/格式规范.md
-grep -q "^| WB04 | overview_year_filter | 软门槛" research-sop/standards/格式规范.md
-grep -q "⑫ \*\*（硬性）图表工作簿结构\*\*" research-sop/standards/审稿清单.md
-grep -q "共 13 条；⑦、⑩、⑫、⑬ 为硬性" research-sop/standards/审稿清单.md
-grep -q "⑬ \*\*（硬性）首页按 Excel 规范第 5 节 E1–E12 自查\*\*" research-sop/standards/审稿清单.md
-grep -q "⑬ （硬性）首页 E1–E12" research-sop/templates/trail_selfcheck.md
+grep -q "^### 13.1 研究报告图表工作簿结构$" research-sop/standards/格式规范.md
+grep -q "^- WB02 \*\*硬门槛\*\*" research-sop/standards/格式规范.md
+grep -q "^- WB04 软门槛" research-sop/standards/格式规范.md
+grep -q "^- ⑫ 有配套图表工作簿时，结构符合格式规范第 13.1 节 WB01–WB06，报告每张数据图在总览上有对应原生图" research-sop/standards/审稿清单.md
+grep -q "共 13 条" research-sop/standards/审稿清单.md
+grep -q "^- ⑬ 有配套图表工作簿时，首页按 Excel 规范建" research-sop/standards/审稿清单.md
 test -s research-sop/standards/Excel规范.md && python3 -c "import json,sys; json.load(open(sys.argv[1], encoding='utf8'))" research-sop/templates/图表总览模板.json
-grep -q "⑫ （硬性）图表工作簿结构" research-sop/templates/trail_selfcheck.md
-if grep -n "审稿清单.md\` 十一条\|十一条机械检查\|审稿清单.md\` 十二条\|十二条机械检查" research-sop/SKILL.md research-sop/PROMPT.md research-sop/templates/trail_selfcheck.md research-prompt/templates/*.md; then
+if grep -n "审稿清单.md\` 十一条\|十一条机械检查\|审稿清单.md\` 十二条\|十二条机械检查" research-sop/SKILL.md research-prompt/templates/*.md; then
   echo "审稿清单已是十三条，不得再写十一条或十二条"; exit 1
 fi
-echo "check_delivery 第 13 项：合规图表工作簿通过；编号页名、总览不在第一张、总览无原生图表、无图表计算页、无来源页、总览图引用语义页、取不到工作簿、--workbook 不存在都不通过且退出码 1；没有配套表格记不适用；--report 按研究对象与版本号挑表格；格式规范 13.1（WB02 硬、WB04 软）、审稿清单 ⑫、自检模板与计数同步"
+echo "check_delivery 第 13 项：合规图表工作簿通过；编号页名、总览不在第一张、总览无原生图表、无图表计算页、无来源页、总览图引用语义页、取不到工作簿、--workbook 不存在都不通过且退出码 1；没有配套表格记不适用；--report 按研究对象与版本号挑表格；格式规范 13.1（WB02 硬、WB04 软）、审稿清单 ⑫ ⑬ 与计数同步"
+# 取消 AI 自检（0.21.0）：只留脚本检查，留档不再有自检
+if grep -rn "trail_selfcheck\|自检九问\|写进自检" research-sop; then echo "research-sop 不得再出现 trail_selfcheck、自检九问、写进自检"; exit 1; fi
+if test -e research-sop/templates/trail_selfcheck.md; then echo "research-sop/templates/trail_selfcheck.md 已删除"; exit 1; fi
+grep -q "^# 交付硬规则清单" research-sop/standards/审稿清单.md || { echo "审稿清单.md 须为交付硬规则清单"; exit 1; }
+grep -q "^### D4 脚本检查" research-sop/SKILL.md || { echo "research-sop SKILL.md 须有 D4 脚本检查"; exit 1; }
+echo "取消 AI 自检：research-sop 无 trail_selfcheck、自检九问、写进自检，自检模板已删除；审稿清单为交付硬规则清单，D4 为脚本检查"
+# 全面精简（0.21.0）：对话版 PROMPT.md 已删，只能对话的 AI 直接粘贴 SKILL.md；主文件字节数上限
+if test -e research-sop/PROMPT.md; then echo "research-sop/PROMPT.md 已删除"; exit 1; fi
+n=$(wc -c < research-sop/SKILL.md); [ "$n" -le 20000 ] || { echo "research-sop/SKILL.md 应 ≤ 20000 字符（wc -c），现为 $n"; exit 1; }
+n=$(wc -c < research-sop/standards/格式规范.md); [ "$n" -le 15000 ] || { echo "格式规范.md 应 ≤ 15000 字符（wc -c），现为 $n"; exit 1; }
+echo "全面精简：research-sop/PROMPT.md 不存在；SKILL.md ≤ 20000、格式规范.md ≤ 15000（wc -c）"
 
 echo "== 8. research-prompt =="
 grep -q "^name: research-prompt$" research-prompt/SKILL.md
@@ -521,13 +529,12 @@ grep -q "要读的角度" research-prompt/SKILL.md || { echo "research-prompt SK
 grep -q "要读的角度" research-prompt/templates/任务书模板.md || { echo "任务书模板第七节须有“要读的角度”"; exit 1; }
 grep -q "文献检索" research-sop/SKILL.md || { echo "research-sop SKILL.md 须有 D1“文献检索”"; exit 1; }
 grep -q "角度清单" research-sop/SKILL.md || { echo "research-sop SKILL.md 须有 D2“角度清单”"; exit 1; }
-grep -q "文献检索" research-sop/PROMPT.md || { echo "research-sop PROMPT.md 须同步“文献检索”"; exit 1; }
 for t in 题型_公司档案 题型_行业 题型_主题; do
   test -s "research-prompt/templates/$t.md" || { echo "缺题型模板：research-prompt/templates/$t.md"; exit 1; }
-  grep -q "读者要能回答的问题" "research-prompt/templates/$t.md" && grep -q "自检加查项" "research-prompt/templates/$t.md" \
-    || { echo "$t.md 须有“读者要能回答的问题”与“自检加查项”"; exit 1; }
+  grep -q "读者要能回答的问题" "research-prompt/templates/$t.md" && grep -q "本题型加项" "research-prompt/templates/$t.md" \
+    || { echo "$t.md 须有“读者要能回答的问题”与“本题型加项”"; exit 1; }
 done
-if grep -n "待迁入 research-prompt" research-sop/SKILL.md research-sop/PROMPT.md; then
+if grep -n "待迁入 research-prompt" research-sop/SKILL.md; then
   echo "research-sop 0.20.0 起类型层已迁入题型模板，不应再有“待迁入”标注"; exit 1
 fi
 grep -q "第五节：股价行为画像与 σ 门槛" research-prompt/templates/题型_公司档案.md || { echo "公司档案题型模板须有第五节 σ 门槛"; exit 1; }

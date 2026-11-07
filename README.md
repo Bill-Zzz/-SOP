@@ -20,22 +20,22 @@
 
 ## 目录
 ```
-SKILL.md  PROMPT.md  METHODS.md  AGENTS.md   估值 skill：完整方法、对话式 AI 精简版、估值方法规范、编程智能体入口
+SKILL.md  METHODS.md  AGENTS.md   估值 skill：完整方法、估值方法规范、编程智能体入口
 LESSONS.md  CHANGELOG.md  VERSION            复盘收件箱、版本记录、版本号
 scripts/          估值 skill 的脚本：研报库索引与检索、PDF 抽取与 OCR、Excel 导出 / 修补 / 重算 / 对比、独立复现
-templates/        估值 skill 的模板：阅读包、研究方向、模型规格、报告大纲、出处台账、核查报告、修订记录、复盘
+templates/        估值 skill 的模板：阅读包、研究方向、模型规格、报告大纲、出处台账、修订记录、复盘
 examples/crwv/    CoreWeave 案例
 research-sop/
-  SKILL.md  PROMPT.md   研究方法与对话式 AI 精简版
-  standards/            格式规范、存储规范、审稿清单、转换后修补清单
-  templates/            报告外壳 report_shell.md，台账、来源清单、自检、结论卡等留档模板
+  SKILL.md              研究方法
+  standards/            格式规范、Excel 规范（图表总览首页）、存储规范、审稿清单（交付硬规则）、转换后修补清单
+  templates/            报告外壳 report_shell.md，台账、来源清单、结论卡等留档模板、图表总览模板
   scripts/              build_history_xlsx.py 历史数据 Excel；md2docx.py 报告转 .docx；check_delivery.py 交付检查
   prompts/              发给执行 AI 的一句话提示词模板
 research-prompt/
   SKILL.md              立项方法
-  templates/            任务书模板；题型模板 题型_公司档案 / 题型_行业 / 题型_主题（各类报告的章节、篇幅、图表分配、随类型变的口径与自检加查项）；通过的任务书入 Google Drive 任务书模板库，仓库不存副本
+  templates/            任务书模板（各题型共用部分）；题型模板 题型_公司档案 / 题型_行业 / 题型_主题（只写各类报告的差异）；通过的任务书入 Google Drive 任务书模板库
 gowork/SKILL.md         开工规矩
-tests/                  自检，GitHub Actions 每次推送自动运行
+tests/                  回归测试，GitHub Actions 每次推送自动运行
 ```
 
 ## 安装
@@ -48,7 +48,7 @@ pip install pymupdf rapidocr-onnxruntime                         # 可选：没�
 #   macOS:  brew install poppler tesseract tesseract-lang && brew install --cask libreoffice
 #   Ubuntu: sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-chi-sim libreoffice-calc
 python3 scripts/pdf_text.py check    # 查看可用工具
-bash tests/run_tests.sh              # 自检，会列出跳过的项
+bash tests/run_tests.sh              # 回归测试，会列出跳过的项
 ```
 
 装进 Claude Code，用软链接，之后 `git pull` 即更新：
@@ -60,7 +60,7 @@ ln -s "$(pwd)/research-prompt" ~/.claude/skills/research-prompt
 ln -s "$(pwd)/gowork"          ~/.claude/skills/gowork
 ```
 
-其他工具：Codex、Cursor 等克隆到工作区即可，会自动读 `AGENTS.md`。ChatGPT、Gemini、Kimi 等对话式 AI，把 `PROMPT.md` 或 `research-sop/PROMPT.md` 粘贴为系统提示。
+其他工具：Codex、Cursor 等克隆到工作区即可，会自动读 `AGENTS.md`。只能对话的 AI（ChatGPT、Gemini、Kimi 等）直接粘贴 `SKILL.md` 或 `research-sop/SKILL.md` 为系统提示。
 
 ## 怎么用
 **立项并研究：**

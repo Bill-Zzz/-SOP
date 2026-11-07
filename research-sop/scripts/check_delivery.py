@@ -19,8 +19,8 @@ Drive 检查项（布局见 Drive 入口文件；命名按 standards/存储规�
   5  根目录只有 底稿/ 一个文件夹
   6  有 底稿/，其下至少一篇（底稿/<篇>/；图片/、共用数据/ 是特殊文件夹，不算篇）；底稿/ 根下只允许最多一份
      文件名含"底稿说明"的 Google 文档，其他文件须进 底稿/<篇>/
-  7  每篇至少有 结论卡、自检、来源清单、数字台账 四类（按文件名含关键字判断；共用数据/ 不要求）
-  8  底稿格式：结论卡、自检、复核记录、数据缺口是 Google 文档；来源清单、数字台账、研报摘要卡、历史节点、
+  7  每篇至少有 结论卡、来源清单、数字台账 三类（按文件名含关键字判断；共用数据/ 不要求）
+  8  底稿格式：结论卡、复核记录、数据缺口是 Google 文档；来源清单、数字台账、研报摘要卡、历史节点、
      股价事件、台账、处理后数据是 Google 表格；来源/ 之外没有 md、csv、docx、xlsx、txt、json 原件（含 共用数据/）
   9  PNG 只在 底稿/图片/ 下
   10 底稿/图片/ 下按篇分子文件夹，名字与 底稿/<篇>/ 对应
@@ -39,15 +39,15 @@ Drive 检查项（布局见 Drive 入口文件；命名按 standards/存储规�
      工作表（如"图表计算"）；有名含"来源"的来源页。取不到工作簿即不通过。
      核对哪几份：给了 --workbook 只查这几份；否则给了 --report 时，查与报告同一研究对象、版本号相同或不带版本号的
      图表数据 / 历史数据表格；都没给时查根目录全部这类表格。一份都没有时记"不适用"（报告没有配套图表工作簿）。
-     来源 ID 能否追到、报告每张数据图在总览上有没有对应原生图，脚本查不了，由审稿清单 ⑫ 人工查。
+     来源 ID 能否追到、报告每张数据图在总览上有没有对应原生图，脚本查不了，是审稿清单 ⑫ 的规则。
 
 本地检查项（给了 --local 才做；本地任务文件夹里 成品/ 可在根目录，也可在每篇子文件夹里）：
   L1 有 成品/，里面有报告（.md 或 .docx）
   L2 有 留痕/，每个 留痕/ 或 留痕/<篇>/ 下都有 复用/ 与 复核/
-  L3 复用/ 里有 结论卡、来源清单、数字台账；复核/ 里有 自检
+  L3 复用/ 里有 结论卡、来源清单、数字台账
 
 输出逐项"通过 / 不通过"及不通过的文件，最后一行"结果：x/y 通过"。全部通过退出码 0，有不通过 1，参数或 rclone 出错 2。
-结果原样粘进自检的机器查部分。只用标准库；不改 Drive、不改本地文件。
+不通过就按输出改到通过，不贴输出。只用标准库；不改 Drive、不改本地文件。
 """
 import argparse
 import io
@@ -74,9 +74,9 @@ EXPORT_MIME = {
 EXPORT_EXT = (".docx", ".xlsx", ".pptx", ".odt", ".ods", ".odp", ".pdf", ".rtf", ".txt", ".csv", ".html", ".svg", ".json")
 RAW_EXT = (".png", ".docx", ".xlsx", ".md", ".csv")          # 根目录不许出现的原件
 TRAIL_RAW_EXT = (".md", ".csv", ".docx", ".xlsx", ".txt", ".json")  # 底稿/<篇>/（来源/ 之外）不许出现的中间件
-DOC_KEYS = ("结论卡", "自检", "复核记录", "数据缺口")
+DOC_KEYS = ("结论卡", "复核记录", "数据缺口")
 SHEET_KEYS = ("来源清单", "数字台账", "研报摘要卡", "历史节点", "股价事件", "台账", "处理后数据")
-REQUIRED = ("结论卡", "自检", "来源清单", "数字台账")
+REQUIRED = ("结论卡", "来源清单", "数字台账")
 TRAIL, PICS, SOURCES, SHARED, NOTE = "底稿", "图片", "来源", "共用数据", "底稿说明"
 # 目录检查（第 12 项）
 TOC_TITLE = "目录"
@@ -199,7 +199,7 @@ def check_drive(items):
         miss = [k for k in REQUIRED if not any(k in i.name for i in files)]
         if miss:
             bad.append(f"底稿/{p}/ 缺 {'、'.join(miss)}")
-    add("每篇有 结论卡、自检、来源清单、数字台账", bad)
+    add("每篇有 结论卡、来源清单、数字台账", bad)
 
     bad = []
     for i in items:
@@ -529,23 +529,21 @@ def check_local(root):
     add("本地 留痕/ 有 复用/ 与 复核/", bad, f"{len(units)} 篇")
 
     bad = []
-    for u in units:  # 缺 复用/ 或 复核/ 的已在上一项报出，这里只查在的那个
+    for u in units:  # 缺 复用/ 的已在上一项报出，这里只查在的
         rel = os.path.relpath(u, root)
         miss = []
         if os.path.isdir(os.path.join(u, "复用")):
             miss += [k for k in ("结论卡", "来源清单", "数字台账") if not _has(os.path.join(u, "复用"), k)]
-        if os.path.isdir(os.path.join(u, "复核")):
-            miss += [k for k in ("自检",) if not _has(os.path.join(u, "复核"), k)]
         if miss:
             bad.append(f"{rel}/ 缺 {'、'.join(miss)}")
-    add("本地 复用/ 有结论卡、来源清单、数字台账，复核/ 有自检", bad)
+    add("本地 复用/ 有结论卡、来源清单、数字台账", bad)
     return res
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description="交付核对：Drive 工作区任务文件夹的布局、命名、格式（及本地 成品/、留痕/ 是否齐）。"
-                    "全部通过退出码 0，有不通过 1，出错 2。结果粘进自检。")
+                    "全部通过退出码 0，有不通过 1，出错 2。不通过就按输出改到通过。")
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--drive", help='rclone 路径，如 "gdrive:<研究库>/10_工作区/20261104_任务名"')
     src.add_argument("--lsjson", help="离线：读已保存的 rclone lsjson -R -M 输出（JSON 文件）")

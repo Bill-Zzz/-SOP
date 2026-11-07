@@ -93,18 +93,6 @@
 }
 },
 {
-"Path": "底稿/ACME/自检.docx",
-"Name": "自检.docx",
-"Size": -1,
-"MimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-"ModTime": "2026-11-05T10:00:00.000Z",
-"IsDir": false,
-"ID": "fixture010",
-"Metadata": {
-"content-type": "application/vnd.google-apps.document"
-}
-},
-{
 "Path": "底稿/ACME/复核记录.docx",
 "Name": "复核记录.docx",
 "Size": -1,
