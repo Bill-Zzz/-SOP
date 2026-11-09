@@ -393,7 +393,7 @@ done
 grep -q "^- V05 \*\*硬门槛\*\*" research-sop/standards/格式规范.md
 grep -q "^- V02 软门槛" research-sop/standards/格式规范.md
 grep -q "^- ⑩ 历史按轮次组织的报告，每个重要轮次有一张股价走势 + 阶段图" research-sop/standards/审稿清单.md
-grep -q "^- ⑪ \`md2docx.py\`\"图表优先\"列出的数字墙、数值大表、没有图的正文章，逐条改成图或删到关键节点" research-sop/standards/审稿清单.md
+grep -q "^- ⑪ \`md2docx.py\`\"图表优先\"列出的数字墙、数值大表、没有图的正文章，供写作者参考" research-sop/standards/审稿清单.md
 if grep -n "审稿清单.md\` 九条" research-sop/SKILL.md research-prompt/templates/任务书模板.md; then
   echo "审稿清单已是十一条，不得再写九条"; exit 1
 fi
@@ -436,6 +436,18 @@ for s in "结果：3/16 通过" "13. 通过    图表工作簿：语义页名、
   grep -qF -- "$s" "$TMP/cd_bad.txt" || { echo "缺少预期输出：$s"; exit 1; }
 done
 if grep -q "自检" "$TMP/cd_good.txt" "$TMP/cd_bad.txt"; then echo "check_delivery 不再要求或检查“自检”文件"; exit 1; fi
+python3 - "$TMP/cd_proc.json" <<'PY2'
+import json, sys
+d = json.load(open("tests/fixtures/check_delivery_good.json", encoding="utf8"))
+tpl = next(x for x in d if not x.get("IsDir"))
+for path, is_dir in (("过程", True), ("过程/状态.md", False), ("过程/ACME", True), ("过程/ACME/fig1.png", False)):
+    e = dict(tpl); e.update(Path=path, Name=path.split("/")[-1], IsDir=is_dir, MimeType="inode/directory" if is_dir else "text/plain", Size=10)
+    d.append(e)
+json.dump(d, open(sys.argv[1], "w", encoding="utf8"), ensure_ascii=False)
+PY2
+python3 research-sop/scripts/check_delivery.py --lsjson "$TMP/cd_proc.json" --local "$TMP/task" --toc-text tests/fixtures/toc_good --workbook-dir "$TMP/wb/good" > "$TMP/cd_proc.txt" 2>&1 || true
+if grep -q "过程/" "$TMP/cd_proc.txt"; then echo "过程/ 应整个不查"; cat "$TMP/cd_proc.txt"; exit 1; fi
+echo "check_delivery：过程/ 整个不查"
 if grep -q "共用数据/ 缺\|ACME_底稿说明_20261105" "$TMP/cd_bad.txt"; then echo "共用数据/ 不按篇要求三类、第一份底稿说明应放行"; exit 1; fi
 if grep -q "来源清单.xlsx" "$TMP/cd_bad.txt"; then echo "无元数据、Size -1 的 .xlsx 应认作 Google 表格"; exit 1; fi
 if grep -q "10-K_2025.pdf\|IR页面存档" "$TMP/cd_good.txt"; then echo "来源/ 里的原件应原样放行"; exit 1; fi
@@ -506,7 +518,15 @@ echo "check_delivery 第 13 项：合规图表工作簿通过；编号页名、�
 # 取消 AI 自检（0.21.0）：只留脚本检查，留档不再有自检
 if grep -rn "trail_selfcheck\|自检九问\|写进自检" research-sop; then echo "research-sop 不得再出现 trail_selfcheck、自检九问、写进自检"; exit 1; fi
 if test -e research-sop/templates/trail_selfcheck.md; then echo "research-sop/templates/trail_selfcheck.md 已删除"; exit 1; fi
-grep -q "^# 交付硬规则清单" research-sop/standards/审稿清单.md || { echo "审稿清单.md 须为交付硬规则清单"; exit 1; }
+grep -q "^# 交付检查清单" research-sop/standards/审稿清单.md || { echo "审稿清单.md 须为交付检查清单"; exit 1; }
+grep -q "只有 ④ 数字比对卡交付" research-sop/standards/审稿清单.md || { echo "审稿清单须写明只有数字比对卡交付"; exit 1; }
+test -s gowork/协作与衔接.md || { echo "缺 gowork/协作与衔接.md"; exit 1; }
+grep -q "^## 1. 不变的原则" gowork/协作与衔接.md || { echo "协作与衔接须有不变的原则"; exit 1; }
+grep -q "协作与衔接.md" gowork/SKILL.md research-sop/SKILL.md research-delivery/SKILL.md research-prompt/SKILL.md || { echo "各 skill 须指向协作与衔接"; exit 1; }
+grep -q "### 本次细则" research-prompt/templates/任务书模板.md || { echo "任务书模板须有本次细则"; exit 1; }
+for t in 题型_公司档案 题型_行业 题型_主题; do grep -q "篇幅默认不设上限" "research-prompt/templates/$t.md" || { echo "$t 不应限页数"; exit 1; }; done
+if grep -nE "Opus|Sonnet|Fable" research-sop/SKILL.md research-delivery/SKILL.md gowork/协作与衔接.md research-prompt/templates/任务书模板.md; then echo "规则不应绑定具体模型"; exit 1; fi
+echo "协作与衔接：不变原则、本次细则、不限页数、规则不绑模型"
 grep -q "^### D4 脚本检查" research-sop/SKILL.md || { echo "research-sop SKILL.md 须有 D4 脚本检查"; exit 1; }
 echo "取消 AI 自检：research-sop 无 trail_selfcheck、自检九问、写进自检，自检模板已删除；审稿清单为交付硬规则清单，D4 为脚本检查"
 # 全面精简（0.21.0）：对话版 PROMPT.md 已删，只能对话的 AI 直接粘贴 SKILL.md；主文件字节数上限

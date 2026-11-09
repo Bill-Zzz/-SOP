@@ -1,6 +1,6 @@
 # 工单 A：取数建表
 
-> research-sop 的机械步骤，在写报告之前做。执行者只读本工单和下面列出的文件，不读 research-sop 的 SKILL.md；默认 Opus 中推理子 Agent，也可以是 Sonnet、Codex 等能跑 shell 与 Python 的 AI。路径相对仓库根目录（GitHub Bill-Zzz/-SOP），不能克隆时取 `https://raw.githubusercontent.com/Bill-Zzz/-SOP/main/<路径>`。依赖 openpyxl，`--png` 需 matplotlib。
+> research-sop 的机械步骤，在写报告之前做。执行者只读本工单和下面列出的文件，不读 research-sop 的 SKILL.md；任何能跑 shell 与 Python 的 AI 都可以做，具体看任务书。路径相对仓库根目录（GitHub Bill-Zzz/-SOP），不能克隆时取 `https://raw.githubusercontent.com/Bill-Zzz/-SOP/main/<路径>`。依赖 openpyxl，`--png` 需 matplotlib。
 
 ## 收到什么（派单写明）
 - 对象：代码与主行业，或行业、主题名；只要主题或行业层时写明。
