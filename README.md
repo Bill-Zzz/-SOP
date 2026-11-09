@@ -8,7 +8,7 @@
 | research-sop | `research-sop/` | 研究：主题、行业、公司三层。全自动，不停下讨论；未来只给方向和量级，不给点预测 |
 | research-delivery | `research-delivery/` | 格式与交付：把写好的 .md、图片、数据表做成 Google 文档与表格，上传、补目录页码、交付核对；只改格式不改内容，可交给便宜的 AI 或 Codex |
 | research-prompt | `research-prompt/` | 立项：盘料、和你谈出角度，写一份任务书交给执行研究的 AI |
-| gowork | `gowork/` | 开工规矩：先复述确认再动手，按模型分工，子 Agent 任务书与收尾 |
+| gowork | `gowork/` | 开工规矩与协作：先复述确认再动手，规则绑角色不绑 AI，`协作与衔接.md` 写清 Drive 衔接、并发和谁都能接手 |
 
 当前版本见 `VERSION`，变更记录见 `CHANGELOG.md`。
 

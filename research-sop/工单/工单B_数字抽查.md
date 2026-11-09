@@ -1,6 +1,6 @@
 # 工单 B：数字抽查
 
-> research-sop 的机械步骤：报告写完、`check_numbers.py` 未命中为 0 之后做。脚本只能证明正文的数在数据里出现过，本工单查台账记的出处本身对不对。执行者只读本工单和下面列出的文件，不读 research-sop 的 SKILL.md；默认 Opus 低推理子 Agent。路径相对仓库根目录（GitHub Bill-Zzz/-SOP）。
+> research-sop 的机械步骤：报告写完、`check_numbers.py` 未命中为 0 之后做。脚本只能证明正文的数在数据里出现过，本工单查台账记的出处本身对不对。执行者只读本工单和下面列出的文件，不读 research-sop 的 SKILL.md；任何能读文件的 AI 都可以做，具体看任务书；不能是写这篇报告的会话。路径相对仓库根目录（GitHub Bill-Zzz/-SOP）。
 
 ## 收到什么
 报告 .md、`数字台账.csv`、`来源清单.csv`、历史数据表、`来源/` 目录（研报库里的按来源清单路径取）。

@@ -16,7 +16,7 @@ Drive 检查项（布局见 Drive 入口文件；命名按 standards/存储规�
   2  根目录文件命名为 研究对象_研究主题_YYYYMMDD 或末尾加 _V1.0（正则 ^[^_]+_[^_]+_\\d{8}(_V\\d+\\.\\d+)?$）
   3  根目录文件只能是 Google 文档或 Google 表格
   4  根目录没有 png、docx、xlsx、md、csv 原件
-  5  根目录只有 底稿/ 一个文件夹
+  5  根目录只有 底稿/ 一个文件夹（过程/ 是接手用的过程件，整个不查）
   6  有 底稿/，其下至少一篇（底稿/<篇>/；图片/、共用数据/ 是特殊文件夹，不算篇）；底稿/ 根下只允许最多一份
      文件名含"底稿说明"的 Google 文档，其他文件须进 底稿/<篇>/
   7  每篇至少有 结论卡、来源清单、数字台账 三类（按文件名含关键字判断；共用数据/ 不要求）
@@ -78,6 +78,7 @@ DOC_KEYS = ("结论卡", "复核记录", "数据缺口")
 SHEET_KEYS = ("来源清单", "数字台账", "研报摘要卡", "历史节点", "股价事件", "台账", "处理后数据")
 REQUIRED = ("结论卡", "来源清单", "数字台账")
 TRAIL, PICS, SOURCES, SHARED, NOTE = "底稿", "图片", "来源", "共用数据", "底稿说明"
+PROCESS = "过程"  # 接手用的过程件，整个不查
 # 目录检查（第 12 项）
 TOC_TITLE = "目录"
 TOC_L1_RE = re.compile(r"^(?:[一二三四五六七八九十]+、|附[一二三四五六七八九十]*[：:、]|附录|一页摘要)")
@@ -164,6 +165,7 @@ def trail_key(name):
 def check_drive(items):
     res = []
     add = lambda name, bad, ok_note="": res.append((name, bad, ok_note))
+    items = [i for i in items if i.parts[0] != PROCESS]
     root_files = [i for i in items if len(i.parts) == 1 and not i.is_dir]
     root_dirs = [i for i in items if len(i.parts) == 1 and i.is_dir]
 
