@@ -551,6 +551,8 @@ fi
 if grep -n "半导体\|周期" research-prompt/SKILL.md research-prompt/templates/任务书模板.md; then
   echo "research-prompt 的 SKILL.md 与任务书模板不得写题型内容（周期内容只放模板库）"; exit 1
 fi
+if grep -rn "先问目的\|做什么决定" research-prompt/; then echo "research-prompt 0.4.0 起不问用途"; exit 1; fi
+grep -q "不做交易判断" research-prompt/templates/任务书模板.md || { echo "任务书模板第五节须固定写不做交易判断"; exit 1; }
 grep -q "要读的角度" research-prompt/SKILL.md || { echo "research-prompt SKILL.md 须要求任务书第七节写“要读的角度”"; exit 1; }
 grep -q "要读的角度" research-prompt/templates/任务书模板.md || { echo "任务书模板第七节须有“要读的角度”"; exit 1; }
 grep -q "文献检索" research-sop/SKILL.md || { echo "research-sop SKILL.md 须有 D1“文献检索”"; exit 1; }
