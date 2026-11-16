@@ -237,9 +237,12 @@ class Export:
         return f"{m['fy']}A" if m["type"] == "7" else f"{m['type']}Q{m['fy'] % 100:02d}A"
 
     def cands(self, key):
+        """取数候选科目，按先后取第一个有数的。科目映射指定的名称一律排第一，
+        即使它本来就在默认候选里（否则映射会被排在前面的默认科目盖掉）。"""
         c = list(CORE_BY_KEY[key][3])
-        if key in self.mapping and self.mapping[key] not in c:
-            c.insert(0, self.mapping[key])
+        nm = self.mapping.get(key)
+        if nm:
+            c = [nm] + [x for x in c if x != nm]
         return c
 
     def core(self, key, per):
@@ -524,7 +527,9 @@ class Builder:
         ws, ex = self.ws["年度衍生指标"], self.ex
         title(ws, f"{ex.code} 年度衍生指标",
               f"公式写在单元格里，全部引用'年度三表'核心科目；金额 {self.U}；比率 %；空白 = 输入缺数。"
-              "FCF = 经营现金流 + 资本开支（资本开支为负数，富途'固定资产交易净额'为购建减处置的净额）；"
+              "FCF = 经营现金流 + 资本开支（资本开支为负数，" + (
+                  f"按科目映射取富途'{ex.mapping['capex']}'" if ex.mapping.get("capex")
+                  else "富途'固定资产交易净额'为购建减处置的净额") + "）；"
               "净现金 = 现金及短期投资 − 短期债务 − 长期债务（债务缺数按 0）；"
               "ROIC = 营业利润 ×（1 − 税率）÷ 期末（股东权益合计 + 短期债务 + 长期债务），税率 = 所得税 ÷ 税前利润，限 0–35%，税前利润 ≤ 0 时取 21%；"
               "ROE = 净利润（归母）÷ 期末归母股东权益；天数按 365 天、期末余额。")

@@ -6,6 +6,7 @@
 #   4) LibreOffice 重算（未安装时明确报告为"跳过"）
 #   5) 历史数据 Excel 脚本：用虚构公司 ACME 的最小长表生成工作簿并跑 --check（含格式规范 Part B 第 9–12 项）；
 #      --png 导出图表快照
+#      科目映射优先于默认候选（tests/test_mapping_priority.py）
 #   6) md2docx.py：合规示例 .md（报告外壳：标题 → 一页摘要 → 目录 → 一、结论与概述 → 各章 → 附：口径与说明；单位表头、
 #      合计行、现场生成的占位 PNG、注释）转 .docx，检查输出（含标题编号、报告外壳、出处标注、图下来源行、图号与文件名、
 #      格式规范 Part A 格式检查：中文、英文与数字统一 Noto Sans SC、行距 1.0、表格 9.5 pt、目录「　…　」）并读回核对；
@@ -17,6 +18,7 @@
 #      命名、格式，并核对本地 成品/、留痕/复用、复核；第 12 项 Google 文档目录二级条目带页码用导出文本样例
 #      （tests/fixtures/toc_good、toc_missing）与人工确认样例（toc_evidence_*.txt）测硬门槛；第 13 项图表工作簿结构
 #      （格式规范第 13.1 节）用 tests/make_workbook_fixture.py 现场生成的合规 / 不合规 xlsx 测硬门槛；不联网
+#      目录分组栏头“研究正文”“附录与资料”跳过（tests/fixtures/toc_groups）
 #   8) research-prompt：SKILL.md 有 frontmatter name、任务书模板在；任务书模板库指向 Drive <研究库>/90_任务书模板库/、
 #      先查 Drive，本地不留模板库副本；SKILL.md 与任务书模板不硬编码文件 ID、不含题型内容；
 #      任务书第七节有“要读的角度”，research-sop SKILL.md 有 D1 文献检索、D2 角度清单；
@@ -214,6 +216,9 @@ EOF
 else
   SKIPPED+=("--png 导出测试（未安装 matplotlib）")
 fi
+
+# 科目映射优先于默认候选（0.23.2）：映射名本来就在默认候选里时也排第一
+python3 tests/test_mapping_priority.py "$TMP" | grep -q "科目映射优先：通过"
 
 echo "== 6. md2docx.py =="
 python3 -c "import docx" 2>/dev/null || pip install -q python-docx --break-system-packages
@@ -478,6 +483,14 @@ $CD --toc-text tests/fixtures/toc_missing --report 半导体_存储周期研究_
 $CD --toc-text tests/fixtures/toc_good --report ACME_库存周期研究_20261105_V1.0 > "$TMP/cd_toc.txt"
 grep -q "Google 文档目录：二级条目必须有页码（硬性）（1 份）" "$TMP/cd_toc.txt"
 echo "check_delivery 第 12 项：二级目录带页码通过；缺页码、无目录段、无文本又无证据、证据写否、证据缺行、证据文件不存在、--report 不存在都不通过且退出码 1；有文本时证据不能推翻；--report 只核对指定报告"
+# 目录分组栏头（格式规范 C01–C09“研究正文”“附录与资料”）不是条目，也不算目录结束（0.23.2）
+$CD --toc-text tests/fixtures/toc_groups > "$TMP/cd_toc.txt"
+grep -q "结果：13/13 通过" "$TMP/cd_toc.txt"
+mkdir -p "$TMP/toc_groups_bad" && cp tests/fixtures/toc_groups/*.txt "$TMP/toc_groups_bad/"
+python3 -c 'import sys; p=sys.argv[1]; s=open(p,encoding="utf-8").read(); a="2.1　第一轮：1983–86　…　5"; assert "研究正文" in s and "附录与资料" in s and a in s; open(p,"w",encoding="utf-8").write(s.replace(a,"2.1　第一轮：1983–86",1))' \
+  "$TMP/toc_groups_bad/ACME_库存周期研究_20261105_V1.0.txt"
+toc_fail "ACME_库存周期研究_20261105_V1.0：二级条目无页码 1/4 条，首条「2.1　第一轮：1983–86」" -- --toc-text "$TMP/toc_groups_bad"
+
 # 第 13 项：图表工作簿结构（硬性；格式规范第 13.1 节 WB01、WB02、WB05、WB06）
 WB="python3 research-sop/scripts/check_delivery.py --lsjson tests/fixtures/check_delivery_good.json --toc-text tests/fixtures/toc_good"
 wb_fail() {  # 用法：wb_fail 期望输出 -- 额外参数…
@@ -578,8 +591,8 @@ grep -q "数字比对：正文数字 19 个，命中 19 个（台账 6、数据�
 grep -q "1 个公式没有缓存值（先重算）" "$TMP/cn_good.txt"
 # 改错一个数、加入不该抽的数（年份、日期、图号、版本、FY、σ、交易日、指数名、小整数），只应报出改错的那个
 cp tests/fixtures/md2docx_sample.md "$TMP/cn_bad.md"
-sed -i 's/52.9 亿美元，毛利率/52.6 亿美元，毛利率/' "$TMP/cn_bad.md"
-sed -i 's/^最大的问题是订阅续约率能否维持；判断见第一章。/最大的问题是订阅续约率能否维持；判断见第一章。FY2025 起按 2025-03-31 口径，单日 3σ、250 个交易日、2.5σ 门槛，对标 S\&P 500，见图 1 与表 1、第 2.1 节，V1.0 版，近 5 年 3 家对手。/' "$TMP/cn_bad.md"
+sed -i.bak 's/52.9 亿美元，毛利率/52.6 亿美元，毛利率/' "$TMP/cn_bad.md"
+sed -i.bak 's/^最大的问题是订阅续约率能否维持；判断见第一章。/最大的问题是订阅续约率能否维持；判断见第一章。FY2025 起按 2025-03-31 口径，单日 3σ、250 个交易日、2.5σ 门槛，对标 S\&P 500，见图 1 与表 1、第 2.1 节，V1.0 版，近 5 年 3 家对手。/' "$TMP/cn_bad.md"
 if python3 research-sop/scripts/check_numbers.py "$TMP/cn_bad.md" --xlsx "$TMP/num/hist.xlsx" --ledger "$TMP/num/数字台账.csv" > "$TMP/cn_bad.txt"; then
   echo "改错的数字应报未命中、退出码 1"; exit 1
 fi

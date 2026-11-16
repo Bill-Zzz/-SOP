@@ -81,6 +81,7 @@ TRAIL, PICS, SOURCES, SHARED, NOTE = "底稿", "图片", "来源", "共用数据
 PROCESS = "过程"  # 接手用的过程件，整个不查
 # 目录检查（第 12 项）
 TOC_TITLE = "目录"
+TOC_GROUPS = ("研究正文", "附录与资料")  # 格式规范 C01–C09 要求的分组栏头，不是条目，也不是目录结束
 TOC_L1_RE = re.compile(r"^(?:[一二三四五六七八九十]+、|附[一二三四五六七八九十]*[：:、]|附录|一页摘要)")
 TOC_L2_RE = re.compile(r"^\d+\.\d+[\s　]")
 TOC_PAGE_RE = re.compile(r"(?:[\t　…]|\.{2,}|\s)\s*\d{1,4}$")
@@ -247,6 +248,8 @@ def parse_toc(text):
         return None, "找不到“目录”一行"
     entries = []
     for ln in lines[start + 1:]:
+        if ln in TOC_GROUPS:
+            continue
         is_entry = (TOC_L1_RE.match(ln) or TOC_L2_RE.match(ln) or "…" in ln or re.search(r"\t\d{1,4}$", ln))
         if not is_entry or (entries and _toc_key(ln) == _toc_key(entries[0])) or len(entries) >= 400:
             break  # 正文从第一个目录条目的标题重新开始，或已不像目录条目
